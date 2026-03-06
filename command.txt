@@ -1,2 +1,0 @@
- To check taht port is listening are not netstat -ano | findstr :5001
- teminate or kill :  taskkill /PID 20260 /F
