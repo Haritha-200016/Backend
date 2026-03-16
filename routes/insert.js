@@ -714,10 +714,10 @@ const insertRealtimeData = (req, res) => {
     console.log(`🔢 Device ${device_id} sending count-only data:`, count1);
   }
 
-  // Get region_id from devices table
+  // Get region_id from devices table - CHANGE db to pool
   const getRegionQuery = `SELECT region_id FROM devices WHERE device_id = ?`;
 
-  db.query(getRegionQuery, [device_id], (err, regionResults) => {
+  pool.query(getRegionQuery, [device_id], (err, regionResults) => {  // ← CHANGED HERE
     if (err) {
       console.error("❌ Error fetching region_id:", err);
       return res.status(500).json({ error: "Database error fetching region_id" });
@@ -730,7 +730,7 @@ const insertRealtimeData = (req, res) => {
 
     const region_id = regionResults[0].region_id;
 
-    // Get previous data point (for calculations)
+    // Get previous data point (for calculations) - CHANGE db to pool
     const getPreviousPointQuery = `
       SELECT latitude, longitude, timestamp
       FROM realtime_sensor_data
@@ -739,7 +739,7 @@ const insertRealtimeData = (req, res) => {
       LIMIT 1
     `;
 
-    db.query(getPreviousPointQuery, [device_id], (err, prevResults) => {
+    pool.query(getPreviousPointQuery, [device_id], (err, prevResults) => {  // ← CHANGED HERE
       if (err) {
         console.error("❌ Error fetching previous data:", err);
         // Continue anyway, just won't have distance calculation
@@ -818,15 +818,15 @@ const insertRealtimeData = (req, res) => {
         ? (parseFloat(altitude) + SEA_LEVEL_RL).toFixed(2)
         : null;
 
-      // Set MySQL timezone
+      // Set MySQL timezone - CHANGE db to pool
       const setTimezoneQuery = "SET SESSION time_zone = '+05:30'";
 
-      db.query(setTimezoneQuery, (timezoneErr) => {
+      pool.query(setTimezoneQuery, (timezoneErr) => {  // ← CHANGED HERE
         if (timezoneErr) {
           console.warn("⚠️ Could not set timezone:", timezoneErr);
         }
 
-        // Insert query - handles all fields, will be NULL if not provided
+        // Insert query - handles all fields, will be NULL if not provided - CHANGE db to pool
         const insertQuery = `
           INSERT INTO realtime_sensor_data (
             device_id,
@@ -871,7 +871,7 @@ const insertRealtimeData = (req, res) => {
           count1 !== undefined ? count1 : null
         ];
 
-        db.query(insertQuery, values, (err, result) => {
+        pool.query(insertQuery, values, (err, result) => {  // ← CHANGED HERE
           if (err) {
             console.error("❌ Database insert error:", err.sqlMessage);
             return res.status(500).json({ error: "Database error: " + err.message });
