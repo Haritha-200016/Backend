@@ -651,7 +651,8 @@ const insertRealtimeData = (req, res) => {
     movement,
     vibration,
     fuel,        // NEW
-    pressure     // NEW
+    pressure,
+    count1     // NEW
   } = req.body;
 
   if (!device_id) {
@@ -795,8 +796,9 @@ const insertRealtimeData = (req, res) => {
             fuel,
             fuel_cost,
             rl,
-            region_id
-          ) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            region_id,
+            count1
+          ) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const values = [
@@ -815,7 +817,8 @@ const insertRealtimeData = (req, res) => {
           parseFloat(fuelUsed.toFixed(6)),
           parseFloat(fuelCost.toFixed(4)),
           rl,
-          region_id
+          region_id,
+          count1 || null
         ];
 
         db.query(insertQuery, values, (err, result) => {
@@ -849,6 +852,7 @@ const insertRealtimeData = (req, res) => {
 
           console.log(`Fuel Used: ${(fuelUsed * 1000).toFixed(2)} mL`);
           console.log(`Fuel Cost: ₹${fuelCost.toFixed(4)}`);
+           console.log(`dump count: ${count1}`);
 
           console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
