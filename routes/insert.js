@@ -641,8 +641,6 @@ const insertRealtimeData = (req, res) => {
 
 const insertRealtimeData = (req, res) => {
 
-  console.log("📡 RAW BODY:", req.body);
-
   const {
     device_id,
     equipment_name,
@@ -662,6 +660,8 @@ const insertRealtimeData = (req, res) => {
     z_axis
   } = req.body;
 
+  console.log("📡 RAW BODY:", req.body);
+
   if (!device_id) {
     return res.status(400).json({ error: "device_id required" });
   }
@@ -669,16 +669,28 @@ const insertRealtimeData = (req, res) => {
   const FUEL_PRICE_PER_LITER = 90;
   const SEA_LEVEL_RL = 525.5;
 
-  const lat = latitude !== "" ? parseFloat(latitude) : null;
-  const lon = longitude !== "" ? parseFloat(longitude) : null;
+  /* ========= SAFE NUMBER FUNCTION ========= */
+
+  const safeFloat = (v) => {
+    const n = parseFloat(v);
+    return isNaN(n) ? null : n;
+  };
+
+  const lat = safeFloat(latitude);
+  const lon = safeFloat(longitude);
+
+  const alt = safeFloat(altitude);
+  const spd = safeFloat(speed);
+  const pit = safeFloat(pitch);
+  const rol = safeFloat(roll);
+  const vib = safeFloat(vibration);
+  const pres = safeFloat(pressure);
 
   const hasGPS = lat !== null && lon !== null;
 
   const hasCount =
     count1 !== undefined &&
     count1 !== null;
-
-  console.log(`📡 Device ${device_id} data:`, req.body);
 
   /* ================= DISTANCE FUNCTION ================= */
 
@@ -768,7 +780,7 @@ const insertRealtimeData = (req, res) => {
 
       pool.query(
         `
-        SELECT latitude, longitude, timestamp
+        SELECT latitude, longitude
         FROM realtime_sensor_data
         WHERE device_id=?
         AND latitude IS NOT NULL
@@ -806,7 +818,7 @@ const insertRealtimeData = (req, res) => {
 
           const BASE = 0.3;
 
-          let rate = BASE * (1 + Math.abs(pitch || 0) * 0.05);
+          let rate = BASE * (1 + Math.abs(pit || 0) * 0.05);
 
           if (movementNumeric > 5) rate *= 1.3;
           if (movementNumeric < -5) rate *= 0.7;
@@ -817,8 +829,8 @@ const insertRealtimeData = (req, res) => {
 
           /* ================= RL ================= */
 
-          if (altitude !== undefined && altitude !== null) {
-            rl = (parseFloat(altitude) + SEA_LEVEL_RL).toFixed(2);
+          if (alt !== null) {
+            rl = (alt + SEA_LEVEL_RL).toFixed(2);
           }
 
           /* ================= INSERT ================= */
@@ -857,13 +869,13 @@ const insertRealtimeData = (req, res) => {
             timestamp ? new Date(timestamp) : new Date(),
             lat,
             lon,
-            altitude || null,
-            speed || null,
-            pitch || null,
-            roll || null,
+            alt,
+            spd,
+            pit,
+            rol,
             movement || null,
-            vibration || null,
-            pressure || null,
+            vib,
+            pres,
             distance,
             fuelUsed,
             fuelCost,
@@ -871,7 +883,7 @@ const insertRealtimeData = (req, res) => {
             region_id,
             gps_status || null,
             z_axis || null,
-            count1 || null
+            count1 !== undefined ? count1 : null
           ];
 
           pool.query(insertQuery, values, (err, result) => {
