@@ -163,6 +163,52 @@ function calculateFuelAndCost(distance, pitch, movement, deviceId, timeDiffHours
   };
 }
 
+//excavator no need fuel and fuelcodt
+/*function calculateFuelAndCost(distance, pitch, movement, equipment_name) {
+
+  let fuel = 0;
+
+  // 1️⃣ Excavators → no fuel calculation
+  if (equipment_name.toLowerCase() === "excavator") {
+    return {
+      fuel: 0,
+      cost: 0
+    };
+  }
+
+  // 2️⃣ Ignore GPS drift (<1 meter)
+  if (distance < 0.001) {
+    return {
+      fuel: 0,
+      cost: 0
+    };
+  }
+
+  const isMoving = distance > 0.001;
+
+  // 3️⃣ Hauler fuel calculation
+  if (equipment_name.toLowerCase() === "hauler" && isMoving) {
+
+    // Base fuel rate (1.52 km per liter)
+    const litersPerKm = 1 / 1.52;
+
+    fuel = distance * litersPerKm;
+
+    const gradientMultiplier = getGradientMultiplier(pitch);
+    const movementMultiplier = getMovementMultiplier(movement);
+
+    fuel = fuel * gradientMultiplier * movementMultiplier;
+
+  }
+
+  const cost = fuel * DIESEL_PRICE_PER_LITER;
+
+  return {
+    fuel: Number(fuel.toFixed(6)),
+    cost: Number(cost.toFixed(2))
+  };
+}*/
+
 // ==================== API ENDPOINTS ====================
 
 // 1. REGISTER TOKEN (Unchanged)
@@ -431,6 +477,7 @@ const registerToken = (req, res) => {
   });
 };*/
 
+/*//THIS CODE WAS WORKING GOOD 
 const insertRealtimeData = (req, res) => {
   const {
     device_id,
@@ -589,9 +636,237 @@ const insertRealtimeData = (req, res) => {
       });
     });
   });
+};*/
+
+const insertRealtimeData = (req, res) => {
+  const {
+    device_id,
+    equipment_name,
+    latitude,
+    longitude,
+    altitude,
+    speed,
+    pitch,
+    roll,
+    movement,
+    vibration,
+    fuel,        // NEW
+    pressure     // NEW
+  } = req.body;
+
+  if (!device_id) {
+    return res.status(400).json({ error: "Missing required field: device_id" });
+  }
+
+  const FUEL_PRICE_PER_LITER = 90;
+
+  // Get region_id from devices table
+  const getRegionQuery = `SELECT region_id FROM devices WHERE device_id = ?`;
+
+  db.query(getRegionQuery, [device_id], (err, regionResults) => {
+
+    if (err) {
+      console.error("❌ Error fetching region_id:", err);
+      return res.status(500).json({ error: "Database error fetching region_id" });
+    }
+
+    if (regionResults.length === 0) {
+      console.error(`❌ Device ${device_id} not found`);
+      return res.status(404).json({ error: `Device ${device_id} not found` });
+    }
+
+    const region_id = regionResults[0].region_id;
+
+    // Get previous GPS point
+    const getPreviousPointQuery = `
+      SELECT latitude, longitude, timestamp
+      FROM realtime_sensor_data
+      WHERE device_id = ?
+      ORDER BY id DESC
+      LIMIT 1
+    `;
+
+    db.query(getPreviousPointQuery, [device_id], (err, prevResults) => {
+
+      let distance = 0;
+      let timeDiffHours = 0;
+
+      if (err) {
+        console.error("❌ Error fetching previous data:", err);
+        return res.status(500).json({ error: "Database error fetching previous data" });
+      }
+
+      // Distance calculation
+      if (prevResults.length > 0 && prevResults[0].latitude && prevResults[0].longitude) {
+        try {
+
+          const prevLat = parseFloat(prevResults[0].latitude);
+          const prevLon = parseFloat(prevResults[0].longitude);
+
+          const currLat = parseFloat(latitude);
+          const currLon = parseFloat(longitude);
+
+          distance = haversineKm([prevLat, prevLon], [currLat, currLon]);
+
+          const prevTime = new Date(prevResults[0].timestamp);
+          const currentTime = new Date();
+
+          timeDiffHours = Math.max(0, (currentTime - prevTime) / 3600000);
+
+        } catch (error) {
+          console.error("❌ Error in distance calculation:", error);
+        }
+      }
+
+      // Movement numeric conversion
+      let movementNumeric = 0;
+
+      if (movement) {
+        if (movement === "DOWN" || movement === "DOWNHILL") movementNumeric = -10;
+        else if (movement === "UP" || movement === "UPHILL") movementNumeric = 10;
+        else if (movement === "STABLE" || movement === "FLAT") movementNumeric = 0;
+        else movementNumeric = parseFloat(movement) || 0;
+      }
+
+      // -------------------------
+      // Fuel Logic
+      // -------------------------
+
+      let fuelUsed = 0;
+      let fuelCost = 0;
+
+      if (fuel !== undefined && fuel !== null) {
+
+        // Fuel sensor value
+        fuelUsed = parseFloat(fuel);
+
+        console.log("⛽ Using Fuel Sensor Value");
+
+      } else {
+
+        // Calculate fuel
+        const calcResult = calculateFuelAndCost(
+          distance,
+          parseFloat(pitch) || 0,
+          movementNumeric,
+          device_id,
+          timeDiffHours
+        );
+
+        fuelUsed = calcResult.fuel;
+
+        console.log("⚙️ Using Calculated Fuel");
+      }
+
+      // Cost for both cases
+      fuelCost = fuelUsed * FUEL_PRICE_PER_LITER;
+
+      // RL calculation
+      const rl =
+        altitude !== undefined
+          ? (parseFloat(altitude) + SEA_LEVEL_RL).toFixed(2)
+          : null;
+
+      // Set MySQL timezone
+      const setTimezoneQuery = "SET SESSION time_zone = '+05:30'";
+
+      db.query(setTimezoneQuery, (timezoneErr) => {
+
+        if (timezoneErr) {
+          console.warn("⚠️ Could not set timezone:", timezoneErr);
+        }
+
+        // Insert query
+        const insertQuery = `
+          INSERT INTO realtime_sensor_data (
+            device_id,
+            equipment_name,
+            timestamp,
+            latitude,
+            longitude,
+            altitude,
+            speed,
+            pitch,
+            roll,
+            movement,
+            vibration,
+            pressure,
+            distance,
+            fuel,
+            fuel_cost,
+            rl,
+            region_id
+          ) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        const values = [
+          device_id,
+          equipment_name || null,
+          latitude ? parseFloat(latitude) : null,
+          longitude ? parseFloat(longitude) : null,
+          altitude !== undefined ? parseFloat(altitude) : null,
+          speed !== undefined ? parseFloat(speed) : null,
+          pitch !== undefined ? parseFloat(pitch) : null,
+          roll !== undefined ? parseFloat(roll) : null,
+          movement || null,
+          vibration !== undefined ? parseFloat(vibration) : null,
+          pressure !== undefined ? parseFloat(pressure) : null,
+          parseFloat(distance.toFixed(6)),
+          parseFloat(fuelUsed.toFixed(6)),
+          parseFloat(fuelCost.toFixed(4)),
+          rl,
+          region_id
+        ];
+
+        db.query(insertQuery, values, (err, result) => {
+
+          if (err) {
+            console.error("❌ Database insert error:", err.sqlMessage);
+            return res.status(500).json({ error: "Database error: " + err.message });
+          }
+
+          // Console output
+          console.log("\n✅ FINAL RESULT:");
+          console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+          console.log(`Device ID: ${device_id}`);
+          console.log(`Equipment: ${equipment_name || "N/A"}`);
+
+          console.log(`Position: ${latitude}, ${longitude}`);
+          console.log(`Altitude: ${altitude || 0} m`);
+
+          console.log(`Speed: ${speed || 0}`);
+          console.log(`Pitch: ${pitch || 0}`);
+          console.log(`Roll: ${roll || 0}`);
+
+          console.log(`Movement: ${movement || "N/A"}`);
+          console.log(`Vibration: ${vibration || 0}`);
+          console.log(`Pressure: ${pressure || 0}`);
+
+          console.log(`RL: ${rl || 0} m`);
+
+          console.log(`Distance: ${(distance * 1000).toFixed(2)} m`);
+
+          console.log(`Fuel Used: ${(fuelUsed * 1000).toFixed(2)} mL`);
+          console.log(`Fuel Cost: ₹${fuelCost.toFixed(4)}`);
+
+          console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
+          res.json({
+            status: "success",
+            message: "Data stored successfully",
+            inserted_id: result.insertId
+          });
+
+        });
+
+      });
+
+    });
+
+  });
+
 };
-
-
 // 3. FETCH DASHBOARD DATA (Updated to include calculated fields)
 const fetchDashboardData = (req, res) => {
   const { company, region } = req.query;
@@ -1366,8 +1641,6 @@ const getAllDevicesDailyData = (req, res) => {
   });
 };
 
-
-
 // ==================== MONTHLY (1st to last day OR 1st to today) ====================
 
 // Get monthly data for a specific device
@@ -1481,7 +1754,6 @@ const getAllDevicesMonthlyData = (req, res) => {
     });
   });
 };
-
 
 
 // This function will be called by your existing routes
@@ -2034,7 +2306,7 @@ const wrapWithAnalysis = (req, res, dataFetcher) => {
 
 // ==================== ANALYSIS ENDPOINT ====================
 
-const generateAnalysisReport = (req, res) => {
+/*const generateAnalysisReport = (req, res) => {
   const { 
     device_id, 
     timeRange, 
@@ -2252,7 +2524,7 @@ const generateAnalysisReport = (req, res) => {
   
   // Call the appropriate data fetcher
   dataFetcher(req, res);
-};
+};*/
 // ==================== DEVICE LIST API ====================
 const getDevices = (req, res) => {
   const { region_id } = req.query;
@@ -2285,7 +2557,8 @@ const getDevices = (req, res) => {
 };
 
 
-/*const fetchDashboardDataby = (req, res) => {
+/*//this is working with delay insted of region name use region_id
+const fetchDashboardDataby = (req, res) => {
   const { region_id, device_id } = req.query;
   
   if (!region_id) {
@@ -2405,10 +2678,10 @@ const getDevices = (req, res) => {
       });
     });
   });
-};*/
+};
+*/
 
-
-
+//i am using this
 const fetchDashboardDataby = (req, res) => {
   const { company, region } = req.query;
 
@@ -2510,8 +2783,9 @@ const fetchDashboardDataby = (req, res) => {
     }
   );
 };
-/*before
-const fetchDashboardDataby = (req, res) => {
+
+//before
+/*const fetchDashboardDataby = (req, res) => {
   const { company, region } = req.query;
 
   if (!company || !region)
@@ -2730,6 +3004,175 @@ const fetchDashboardDataby = (req, res) => {
     }
   );
 };*/
+
+// ==================== ANALYSIS ENDPOINT ====================
+const generateAnalysisReport = (req, res) => {
+  const { 
+    device_id, 
+    timeRange, 
+    shift,
+    region_id 
+  } = req.query;
+  
+  if (!device_id || !timeRange) {
+    return res.status(400).json({ 
+      error: "device_id and timeRange required" 
+    });
+  }
+
+  console.log(`📊 Generating analysis for ${device_id} - ${timeRange} ${shift || ''} (Region: ${region_id || 'ALL'})`);
+
+  // Check if we need ALL devices or a specific one
+  const isAllDevices = device_id === 'all';
+  
+  // Choose the right data fetcher based on timeRange and device selection
+  let dataFetcher;
+  
+  if (isAllDevices) {
+    // Use the "ALL" versions of your functions
+    if (timeRange === 'shift' && shift) {
+      let shiftParam = '';
+      if (shift === '6am-2pm') shiftParam = 'morning';
+      else if (shift === '2pm-10pm') shiftParam = 'afternoon';
+      else if (shift === '10pm-6am') shiftParam = 'night';
+      
+      req.query.shift = shiftParam;
+      if (region_id) req.query.region_id = region_id;
+      dataFetcher = getAllDevicesShiftData;
+    } 
+    else if (timeRange === 'daily') {
+      if (region_id) req.query.region_id = region_id;
+      dataFetcher = getAllDevicesDailyData;
+    }
+    else if (timeRange === 'monthly') {
+      if (region_id) req.query.region_id = region_id;
+      dataFetcher = getAllDevicesMonthlyData;
+    }
+    else {
+      return res.status(400).json({ error: "Invalid timeRange" });
+    }
+  } else {
+    // Use single device versions
+    if (timeRange === 'shift' && shift) {
+      let shiftParam = '';
+      if (shift === '6am-2pm') shiftParam = 'morning';
+      else if (shift === '2pm-10pm') shiftParam = 'afternoon';
+      else if (shift === '10pm-6am') shiftParam = 'night';
+      
+      req.query.shift = shiftParam;
+      if (region_id) req.query.region_id = region_id;
+      dataFetcher = getDeviceShiftData;
+    } 
+    else if (timeRange === 'daily') {
+      if (region_id) req.query.region_id = region_id;
+      dataFetcher = getDeviceDailyData;
+    }
+    else if (timeRange === 'monthly') {
+      if (region_id) req.query.region_id = region_id;
+      dataFetcher = getDeviceMonthlyData;
+    }
+    else {
+      return res.status(400).json({ error: "Invalid timeRange" });
+    }
+  }
+
+  // Store the original res.json
+  const originalJson = res.json;
+  
+  // Override res.json to capture the data
+  res.json = function(data) {
+    // Check if we have data in any format
+    let records = [];
+    
+    // Handle different response formats
+    if (data && data.data && Array.isArray(data.data)) {
+      records = data.data;
+    } else if (data && Array.isArray(data)) {
+      records = data;
+    } else if (data && data.results && Array.isArray(data.results)) {
+      records = data.results;
+    }
+    
+    console.log(`📊 Found ${records.length} records for analysis`);
+    
+    // Format data for Python
+    const pythonInput = {
+      data: records.map(row => ({
+        device_id: row.device_id || device_id,
+        time: row.timestamp,
+        lat: parseFloat(row.latitude || 0),
+        lon: parseFloat(row.longitude || 0),
+        pitch: parseFloat(row.pitch || 0),
+        fuel: parseFloat(row.fuel || 0),
+        speed: parseFloat(row.speed || 0),
+        distance: parseFloat(row.distance || 0),
+        fuel_cost: parseFloat(row.fuel_cost || 0)
+      }))
+    };
+    
+    console.log(`🚀 Sending ${records.length} records to Python for analysis...`);
+    
+    // Call Python script
+    const pythonProcess = exec('python routes/analysis.py', (error, stdout, stderr) => {
+      if (error) {
+        console.error('❌ Python error:', error);
+        return originalJson.call(res, { error: "Analysis failed: " + error.message });
+      }
+      
+      if (stderr) {
+        console.log('📝 Python log:', stderr);
+      }
+      
+      try {
+        const result = JSON.parse(stdout);
+        
+        // Check the status from Python
+        if (result.status === 'error') {
+          console.error('❌ Python analysis error:', result.error);
+          return originalJson.call(res, { error: result.error });
+        }
+        
+        // Your analysis.py returns 'report' field with base64 Excel data
+        if (!result.report) {
+          console.error('❌ No report data in Python output');
+          console.log('Python output keys:', Object.keys(result));
+          return originalJson.call(res, { error: "No report data generated" });
+        }
+        
+        // Decode the base64 Excel file
+        const excelBuffer = Buffer.from(result.report, 'base64');
+        
+        // Use filename from Python
+        const filename = result.filename || `analysis_${device_id}_${timeRange}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        
+        // Set correct headers for Excel file download
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', excelBuffer.length);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        
+        // Send the Excel file
+        res.send(excelBuffer);
+        
+        console.log(`✅ Analysis complete! Excel report sent: ${filename}`);
+        console.log(`📊 Report size: ${(excelBuffer.length / 1024).toFixed(2)} KB`);
+        
+      } catch (e) {
+        console.error('❌ Failed to parse Python output:', e);
+        console.log('Raw output (first 500 chars):', stdout.substring(0, 500));
+        originalJson.call(res, { error: "Failed to generate report - invalid response from analysis engine" });
+      }
+    });
+    
+    pythonProcess.stdin.write(JSON.stringify(pythonInput));
+    pythonProcess.stdin.end();
+  };
+  
+  // Call the appropriate data fetcher
+  dataFetcher(req, res);
+};
 // ==================== EXPORT ALL FUNCTIONS ====================
 module.exports = {
   register,

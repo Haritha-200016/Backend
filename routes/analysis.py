@@ -198,7 +198,7 @@ class AIPoweredMiningAnalytics:
     
     def analyze_device(self, device_id, df):
         """Complete AI-powered analysis for a single device"""
-        if len(df) < 10:
+        if len(df) < 0:       #length of fetch data 
             return None
         
         try:
@@ -263,7 +263,7 @@ class AIPoweredMiningAnalytics:
                 mask = df['gradient_class'] == gradient
                 grad_data = df[mask]
                 
-                if len(grad_data) > 0:
+                if len(grad_data) > 0:    #lenght of fetch data
                     distance = float(grad_data['distance_km'].sum())
                     fuel = float(grad_data['fuel'].sum())
                     
@@ -720,7 +720,7 @@ def main():
             
             device_df = df[df['device_id'] == device_id].copy()
             
-            if len(device_df) < 10:
+            if len(device_df) < 0:
                 print(f"Device {device_id}: insufficient data", file=sys.stderr)
                 continue
             

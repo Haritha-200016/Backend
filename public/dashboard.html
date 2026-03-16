@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,7 +18,7 @@
       height: 200px;
       display: block;
       border-radius: 12px;
-      box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
     }
 
     .life-table {
@@ -26,7 +27,8 @@
       color: white;
     }
 
-    .life-table th, .life-table td {
+    .life-table th,
+    .life-table td {
       border: 1px solid #ccc;
       padding: 8px;
       text-align: center;
@@ -154,37 +156,37 @@
       overflow: hidden;
     }
 
-    .line > span {
+    .line>span {
       display: block;
       height: 100%;
       width: 0;
     }
 
-    .c-green .line > span {
+    .c-green .line>span {
       background: var(--ok);
     }
 
-    .c-orange .line > span {
+    .c-orange .line>span {
       background: var(--warn);
     }
 
-    .c-red .line > span {
+    .c-red .line>span {
       background: var(--bad);
     }
 
-    .c-blue .line > span {
+    .c-blue .line>span {
       background: var(--blue);
     }
 
-    .c-purple .line > span {
+    .c-purple .line>span {
       background: var(--purple);
     }
 
-    .c-teal .line > span {
+    .c-teal .line>span {
       background: var(--teal);
     }
 
-    .c-yellow .line > span {
+    .c-yellow .line>span {
       background: var(--yellow);
     }
 
@@ -451,7 +453,7 @@
       z-index: 2;
       color: #ffffff;
       font-weight: bold;
-      font-size: 18px;
+      font-size: 17px;
       text-align: center;
       padding: 8px;
       line-height: 1.2;
@@ -495,7 +497,7 @@
       background-color: #4d96ff;
       width: 68%;
     }
-    
+
     .card {
       background-color: #1a1a1a;
       background: #1e1f23;
@@ -552,7 +554,7 @@
       border-top: 1px solid #f5a623;
       margin: 0;
     }
-    
+
     .value {
       font-size: 1rem;
       font-weight: bold;
@@ -652,7 +654,7 @@
     .sparkline-canvas {
       height: 60px !important;
     }
-    
+
     #dashboard-title {
       text-align: center;
       color: #ffffff;
@@ -660,11 +662,11 @@
       font-size: 30px;
       display: block;
     }
-    
+
     #dashboard-title.hidden {
       display: none;
     }
-    
+
     #loading-overlay {
       position: fixed;
       top: 0;
@@ -680,7 +682,7 @@
       color: white;
       font-family: Arial, sans-serif;
     }
-    
+
     .loading-spinner {
       width: 50px;
       height: 50px;
@@ -696,7 +698,7 @@
       margin-bottom: 10px;
       color: #6ff3d6;
     }
-    
+
     .loading-subtext {
       font-size: 14px;
       color: #ccc;
@@ -704,7 +706,7 @@
       max-width: 400px;
       line-height: 1.4;
     }
-    
+
     #Fuel {
       visibility: hidden;
     }
@@ -757,7 +759,7 @@
 
     .report-btn:hover {
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
 
     .btn-icon {
@@ -770,7 +772,7 @@
         gap: 8px;
         padding: 12px;
       }
-      
+
       .report-btn {
         width: 100%;
         min-width: auto;
@@ -780,10 +782,15 @@
     }
 
     @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
     }
-    
+
     @media (max-width: 768px) {
       .dashboard1 {
         grid-template-columns: 1fr;
@@ -806,13 +813,14 @@
     }
   </style>
 </head>
+
 <body>
   <h1 id="dashboard-title">Mining Sensor Dashboard</h1>
   <div id="loading-overlay" style="display: none;">
     <div class="loading-spinner"></div>
     <div class="loading-text">Loading Dashboard...</div>
   </div>
-  
+
   <div id="panel-header" style="display:none; align-items:center; gap:100px; padding:10px; background:transparent">
     <button onclick="goBack()">⬅ Back</button>
     <span id="panel-title" style="font-weight:bold; font-size:18px;"></span>
@@ -824,7 +832,7 @@
       <img src="images/overview1.jpg" alt="Overview" class="panel-bg">
     </div>
     <div id="tile-fuel" class="panel-title" onclick="togglePanel('Fuel', 'Mine Planner')">
-      <div class="panel-label">Mine Planner</div>
+      <div class="panel-label">OCM Mine Planner</div>
       <img src="images/fm.jpg" alt="Mine Planner" class="panel-bg">
     </div>
     <div id="tile-env" class="panel-title" onclick="togglePanel('env', 'ENV Monitoring')">
@@ -844,11 +852,11 @@
       <img src="images/pd2.jpg" alt="Prediction Dashboard" class="panel-bg">
     </div>
     <div id="tile-cm" class="panel-title" onclick="togglePanel('Continuous_minier', 'Continuous Miner')">
-      <div class="panel-label">Continuous Miner</div>
+      <div class="panel-label">UCM Continuous Miner</div>
       <img src="images/cm2.jpg" alt="Continuous Miner" class="panel-bg">
     </div>
     <div id="tile-ram" class="panel-title" onclick="togglePanel('Ram_car', 'Ram Car')">
-      <div class="panel-label">Ram Car</div>
+      <div class="panel-label">UCM Ram Car</div>
       <img src="images/ram.jpg" alt="Ram Car" class="panel-bg">
     </div>
     <div id="tile-sail" class="panel-title" onclick="togglePanel('Manufacturing', 'Manufacturing')">
@@ -856,7 +864,7 @@
       <img src="images/ma.jpg" alt="Manufacturing" class="panel-bg">
     </div>
     <div id="tile-drone" class="panel-title" onclick="togglePanel('DroneStream', 'Drone Live Stream')">
-      <div class="panel-label">Drone Stream</div>
+      <div class="panel-label">OCM Drone Stream</div>
       <img src="images/drone-setup.jpg" alt="Drone Stream" class="panel-bg">
     </div>
     <div id="tile-dump" class="panel-title" onclick="togglePanel('Dump', 'Live Dump')">
@@ -891,17 +899,17 @@
     // Region to region_id mapping
     const regionMapping = {
       'Kache': 5,
-      'Demo_Region': 5,
       'Bhilai': 3,
       'Tilaboni Mine': 7,
       'Drone survey': 9,
-      'Churcha West': 4
+      'Churcha West': 4,
+      'Velastra': 6
     };
 
     // Report types available per region
     const regionReports = {
       'Kache': ['shift', 'daily', 'monthly'],
-      'Demo_Region': ['shift', 'daily', 'monthly'],
+      'Velastra': ['shift', 'daily', 'monthly'],
       'Tilaboni Mine': ['daily', 'monthly'],
       'Bhilai': ['daily', 'monthly'],
       'Drone survey': ['daily'],
@@ -913,7 +921,13 @@
 
     // ==================== DOM READY ====================
     document.addEventListener("DOMContentLoaded", () => {
-      if (region === "Kache" || region === "Demo_Region") {
+      if (region === "Velastra") {
+        document.querySelectorAll("#all-panels .panel-title").forEach(el => {
+          el.style.display = "block";
+        });
+        return;
+      }
+      if (region === "Kache") {
         showOnly(["tile-fuel"]);
         return;
       }
@@ -929,7 +943,7 @@
         showOnly(["tile-dump"]);
         return;
       }
-      
+
       document.querySelectorAll("#all-panels .panel-title").forEach(el => {
         if (el.id === "tile-fuel" || el.id === "tile-sail" || el.id === "tile-drone" || el.id === "tile-dump") {
           el.style.display = "none";
@@ -948,7 +962,7 @@
     // ==================== UTILITY FUNCTIONS ====================
     const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
     const fmt = (n, dec = 0) => (n == null || isNaN(n)) ? '-' : Number(n).toFixed(dec);
-    
+
     const statusClass = (txt = '') => {
       const v = (txt || '').toString().toLowerCase();
       if (v.includes('fault') || v.includes('fail') || v.includes('hife')) return 'bad';
@@ -1129,8 +1143,41 @@
       try {
         const res = await fetch(API_URL);
         const json = await res.json();
-        console.log("Fetched data:", json);
-        cachedData = json.data || [];
+        console.log("Fetched data for region:", region, json);
+
+        // Handle different data structures
+        if (json.status === 'success') {
+          if (json.data && Array.isArray(json.data)) {
+            cachedData = json.data;
+          } else if (json.devices && Array.isArray(json.devices)) {
+            // Check if devices is array of strings or objects
+            if (json.devices.length > 0 && typeof json.devices[0] === 'object') {
+              cachedData = json.devices;
+            } else {
+              // If devices is array of strings, we need to fetch individual device data
+              console.log("Devices array is strings, creating placeholder data");
+              cachedData = json.devices.map(deviceId => ({
+                device_id: deviceId,
+                timestamp: new Date().toISOString(),
+                latitude: region === 'Velastra' ? 23.5 : 12.9567,
+                longitude: region === 'Velastra' ? 87.3 : 77.73086,
+                altitude: 0,
+                pitch: 0,
+                roll: 0,
+                vibration: 0,
+                movement: 'STABLE',
+                load: 0,
+                speed: 0
+              }));
+            }
+          } else {
+            cachedData = [];
+          }
+        } else {
+          cachedData = [];
+        }
+
+        console.log("Processed data for", region, ":", cachedData);
         return cachedData;
       } catch (err) {
         console.error("Failed to fetch data:", err);
@@ -1156,11 +1203,11 @@
       document.querySelectorAll('.panel-content').forEach(c => c.style.display = 'none');
       document.getElementById('all-panels').style.display = 'none';
       document.getElementById('dashboard-title').classList.add('hidden');
-      
+
       const content = document.getElementById(panelId);
       if (content) {
         content.style.display = 'block';
-        
+
         if (panelId === 'Fuel') {
           showLoading("Initializing Mine Planner...");
           content.innerHTML = '<div style="display:none"></div>';
@@ -1187,7 +1234,14 @@
     }
 
     // ==================== DEVICE NAME MAPPING ====================
-    const deviceDisplayNames = { 'D3': '25', 'D8': '97', 'D9': '12' };
+    const deviceDisplayNames = {
+      'D3': '25',
+      'D7': '07',
+      'D8': '08',
+      'D9': '09',
+      'D12': '12',
+      'D14': '14'
+    };
 
     function getDisplayName(deviceId) {
       return deviceDisplayNames[deviceId] || deviceId;
@@ -1204,6 +1258,10 @@
     function createReportButtons(container, availableReports) {
       const buttonsContainer = document.createElement('div');
       buttonsContainer.className = 'report-buttons-container';
+      const heading = document.createElement('div');
+      heading.className = 'report-heading';
+      heading.innerHTML = '📊 MINING REPORTS';
+      buttonsContainer.appendChild(heading);
 
       if (availableReports.includes('shift')) {
         const shift1 = document.createElement('button');
@@ -1245,70 +1303,67 @@
     }
 
     async function downloadReport(reportType, shift = null) {
-  const region_id = regionMapping[region] || 5;
-  const selectedDevice = 'all'; // Always use 'all' for all devices
-  
-  let message = `Generating ${reportType} analysis for ${region}...`;
-  if (reportType === 'shift') message = `Generating ${shift} shift analysis for ${region}...`;
-  
-  console.log(message);
-  showLoading(message);
+      const region_id = regionMapping[region] || 5;
 
-  try {
-    let url;
-    // ✅ Use generate-analysis endpoint
-    if (reportType === 'shift') {
-      url = `${BASE_URL}/generate-analysis?device_id=${selectedDevice}&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
-    } else if (reportType === 'daily') {
-      url = `${BASE_URL}/generate-analysis?device_id=${selectedDevice}&timeRange=daily&region_id=${region_id}`;
-    } else if (reportType === 'monthly') {
-      url = `${BASE_URL}/generate-analysis?device_id=${selectedDevice}&timeRange=monthly&region_id=${region_id}`;
+      let message = `Generating ${reportType} report for ${region}...`;
+      if (reportType === 'shift') message = `Generating ${shift} shift report for ${region}...`;
+
+      console.log(message);
+      showLoading(message);
+
+      try {
+        let url;
+        if (reportType === 'shift') {
+          url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
+        } else if (reportType === 'daily') {
+          url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=daily&region_id=${region_id}`;
+        } else if (reportType === 'monthly') {
+          url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
+        }
+
+        console.log(`📡 Fetching from: ${url}`);
+        const response = await fetch(url);
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        const contentType = response.headers.get('content-type');
+
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          alert(`Analysis failed: ${errorData.error || 'Unknown error'}`);
+          return;
+        }
+
+        const blob = await response.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        let filename = `Analysis_${region}_${reportType}`;
+        if (reportType === 'shift') filename += `_${shift}`;
+        filename += `_${dateStr}.xlsx`;
+
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(downloadUrl);
+        }, 100);
+
+        console.log(`✅ Analysis report downloaded: ${filename}`);
+
+      } catch (error) {
+        console.error('Error generating analysis:', error);
+        alert(`Failed to generate analysis: ${error.message}`);
+      } finally {
+        hideLoading();
+      }
     }
 
-    console.log(`📡 Fetching analysis from: ${url}`);
-    const response = await fetch(url);
-    
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    
-    // Check if response is Excel file or JSON error
-    const contentType = response.headers.get('content-type');
-    
-    if (contentType && contentType.includes('application/json')) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Unknown error');
-    }
-    
-    // Get the Excel file blob
-    const blob = await response.blob();
-    
-    // Generate filename
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];
-    let filename = `${region}_${reportType}_analysis_${dateStr}.xlsx`;
-    if (reportType === 'shift') filename = `${region}_${shift}_analysis_${dateStr}.xlsx`;
-
-    // Download the file
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    
-    setTimeout(() => {
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(downloadUrl);
-    }, 100);
-
-    console.log(`✅ Analysis downloaded: ${filename}`);
-
-  } catch (error) {
-    console.error('Error generating analysis:', error);
-    alert(`Failed to generate analysis: ${error.message}`);
-  } finally {
-    hideLoading();
-  }
-}
     // Make functions globally available
     window.downloadReport = downloadReport;
     window.getDisplayName = getDisplayName;
@@ -1317,7 +1372,12 @@
     // ==================== RENDER DASHBOARD ====================
     async function renderDashboard(panelId) {
       const data = await fetchData();
-      data.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+      // Sort by timestamp if available
+      if (data && data.length > 0) {
+        data.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      }
+
       const latest = data.length > 0 ? data[data.length - 1] : {};
 
       const container = document.getElementById(panelId);
@@ -1335,122 +1395,285 @@
 
       if (panelId === 'view') {
         container.innerHTML = `
-          <div class="dashboard1">
-            <div class="card">
-              <h2 class="text-lg font-semibold mb-4">Open-Pit and Underground Mining</h2>
-              <div id="chart-blast-areas"></div>
-              <div id="chart-development-meters"></div>
-              <div id="chart-production-meters"></div>
-              <div id="chart-ore-mined"></div>
-            </div>
-            <div class="card">
-              <h2 class="text-lg font-semibold mb-4">Crushing & Processing Plant</h2>
-              <div id="chart-throughput"></div>
-              <div id="chart-crusher-availability"></div>
-              <div id="chart-mill-vibration"></div>
-              <div id="chart-power-consumption"></div>
-            </div>
-            <div class="card">
-              <h2 class="text-lg font-semibold mb-4">Contractor Equipment</h2>
-              <div id="chart-dump-trucks"></div>
-              <div id="chart-excavators"></div>
-              <div id="chart-drills"></div><br><br><br>
-              <div class="flex justify-between mb-2 text-lg"><span>Dump Trucks</span><span class="big-value">88%</span></div>
-              <div class="flex justify-between mb-2 text-lg"><span>Excavators</span><span class="big-value">73%</span></div>
-              <div class="flex justify-between text-lg"><span>Drills</span><span class="big-value">61%</span></div>
-            </div>
-            <div class="card">
-              <h2 class="text-lg font-semibold mb-2">Utilization</h2>
-              <div class="value mb-1">27%</div>
-              <div class="sub-label mb-2">Exploration Completed</div>
-              <canvas id="utilizationChart" height="100"></canvas>
-            </div>
-            <div class="card">
-              <h2 class="text-lg font-semibold mb-2">Exploration</h2>
-              <div class="relative w-32 h-32 mx-auto">
-                <canvas id="explorationPie"></canvas>
-                <div class="absolute inset-0 flex items-center justify-center">
-                  <span class="text-2xl font-bold">27%</span>
-                </div>
-              </div>
-              <div class="mt-4 space-y-1 text-base">
-                <p class="sub-label">Exploration Expenditure <span class="big-value block">$380K</span></p>
-                <p class="sub-label">Higher Utilization <span class="big-value block">10.2%</span></p>
-                <p class="sub-label">Completed Targets <span class="big-value block">22</span></p>
+        <div class="dashboard1">
+          <div class="card">
+            <h2 class="text-lg font-semibold mb-4">Open-Pit and Underground Mining</h2>
+            <div id="chart-blast-areas"></div>
+            <div id="chart-development-meters"></div>
+            <div id="chart-production-meters"></div>
+            <div id="chart-ore-mined"></div>
+          </div>
+          <div class="card">
+            <h2 class="text-lg font-semibold mb-4">Crushing & Processing Plant</h2>
+            <div id="chart-throughput"></div>
+            <div id="chart-crusher-availability"></div>
+            <div id="chart-mill-vibration"></div>
+            <div id="chart-power-consumption"></div>
+          </div>
+          <div class="card">
+            <h2 class="text-lg font-semibold mb-4">Contractor Equipment</h2>
+            <div id="chart-dump-trucks"></div>
+            <div id="chart-excavators"></div>
+            <div id="chart-drills"></div><br><br><br>
+            <div class="flex justify-between mb-2 text-lg"><span>Dump Trucks</span><span class="big-value">88%</span></div>
+            <div class="flex justify-between mb-2 text-lg"><span>Excavators</span><span class="big-value">73%</span></div>
+            <div class="flex justify-between text-lg"><span>Drills</span><span class="big-value">61%</span></div>
+          </div>
+          <div class="card">
+            <h2 class="text-lg font-semibold mb-2">Utilization</h2>
+            <div class="value mb-1">27%</div>
+            <div class="sub-label mb-2">Exploration Completed</div>
+            <canvas id="utilizationChart" height="100"></canvas>
+          </div>
+          <div class="card">
+            <h2 class="text-lg font-semibold mb-2">Exploration</h2>
+            <div class="relative w-32 h-32 mx-auto">
+              <canvas id="explorationPie"></canvas>
+              <div class="absolute inset-0 flex items-center justify-center">
+                <span class="text-2xl font-bold">27%</span>
               </div>
             </div>
-            <div class="card">
-              <h2 class="text-lg font-semibold mb-4">Production vs. Plan</h2>
-              <div class="space-y-3">
-                <div><div class="text-base mb-1">Dump Trucks <span class="float-right font-bold">68%</span></div><div class="w-full h-2 bg-gray-800 rounded"><div class="h-2 bg-yellow-400 rounded" style="width: 68%;"></div></div></div>
-                <div><div class="text-base mb-1">Excavators <span class="float-right font-bold">73%</span></div><div class="w-full h-2 bg-gray-800 rounded"><div class="h-2 bg-yellow-400 rounded" style="width: 73%;"></div></div></div>
-                <div><div class="text-base mb-1">Drills <span class="float-right font-bold">61%</span></div><div class="w-full h-2 bg-gray-800 rounded"><div class="h-2 bg-yellow-400 rounded" style="width: 61%;"></div></div></div>
-                <div><div class="text-base mb-1">Loaders <span class="float-right font-bold">79%</span></div><div class="w-full h-2 bg-gray-800 rounded"><div class="h-2 bg-yellow-400 rounded" style="width: 79%;"></div></div></div>
-              </div>
-            </div>
-            <div class="card">
-              <h2 class="text-lg font-semibold mb-2">Production vs Plan</h2>
-              <canvas id="productionChart" height="120"></canvas>
+            <div class="mt-4 space-y-1 text-base">
+              <p class="sub-label">Exploration Expenditure <span class="big-value block">$380K</span></p>
+              <p class="sub-label">Higher Utilization <span class="big-value block">10.2%</span></p>
+              <p class="sub-label">Completed Targets <span class="big-value block">22</span></p>
             </div>
           </div>
+          <div class="card">
+            <h2 class="text-lg font-semibold mb-4">Production vs. Plan</h2>
+            <div class="space-y-3">
+              <div>
+                <div class="text-base mb-1">Dump Trucks <span class="float-right font-bold">68%</span></div>
+                <div class="w-full h-2 bg-gray-800 rounded"><div class="h-2 bg-yellow-400 rounded" style="width: 68%;"></div></div>
+              </div>
+              <div>
+                <div class="text-base mb-1">Excavators <span class="float-right font-bold">73%</span></div>
+                <div class="w-full h-2 bg-gray-800 rounded"><div class="h-2 bg-yellow-400 rounded" style="width: 73%;"></div></div>
+              </div>
+              <div>
+                <div class="text-base mb-1">Drills <span class="float-right font-bold">61%</span></div>
+                <div class="w-full h-2 bg-gray-800 rounded"><div class="h-2 bg-yellow-400 rounded" style="width: 61%;"></div></div>
+              </div>
+              <div>
+                <div class="text-base mb-1">Loaders <span class="float-right font-bold">79%</span></div>
+                <div class="w-full h-2 bg-gray-800 rounded"><div class="h-2 bg-yellow-400 rounded" style="width: 79%;"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h2 class="text-lg font-semibold mb-2">Production vs Plan</h2>
+            <canvas id="productionChart" height="120"></canvas>
+          </div>
         `;
-        
         setTimeout(() => {
-          const createChart = (elementId, title, dataField, color, unit) => {
-            const element = document.getElementById(elementId);
-            if (element) {
-              const values = data.map(d => d[dataField]).filter(v => v !== undefined && v !== null);
-              if (values.length > 0) {
-                element.appendChild(makeLineChart(title, data.map(d => d.timestamp), values, color, `${latest[dataField] || 0} ${unit}`));
+          const blastChart = document.getElementById('chart-blast-areas');
+          if (blastChart) {
+            blastChart.appendChild(
+              makeLineChart(
+                'Active Blast Areas',
+                data.map(d => d.timestamp),
+                data.map(d => d.active_blast_areas),
+                '#ff6b6b',
+                `${latest.active_blast_areas || 0}`
+              )
+            );
+          }
+
+          const devChart = document.getElementById('chart-development-meters');
+          if (devChart) {
+            devChart.appendChild(
+              makeLineChart(
+                'Development Meters',
+                data.map(d => d.timestamp),
+                data.map(d => d.development_meters),
+                '#6bcB77',
+                `${latest.development_meters || 0} m`
+              )
+            );
+          }
+
+          const prodChart = document.getElementById('chart-production-meters');
+          if (prodChart) {
+            prodChart.appendChild(
+              makeLineChart(
+                'Production Meters',
+                data.map(d => d.timestamp),
+                data.map(d => d.production_meters),
+                '#4D96FF',
+                `${latest.production_meters || 0} m`
+              )
+            );
+          }
+
+          const oreChart = document.getElementById('chart-ore-mined');
+          if (oreChart) {
+            oreChart.appendChild(
+              makeLineChart(
+                'Ore Mined',
+                data.map(d => d.timestamp),
+                data.map(d => d.ore_mined),
+                '#FFC300',
+                `${latest.ore_mined || 0} kt`
+              )
+            );
+          }
+
+          const throughputChart = document.getElementById('chart-throughput');
+          if (throughputChart) {
+            throughputChart.appendChild(
+              makeLineChart(
+                'Throughput',
+                data.map(d => d.timestamp),
+                data.map(d => d.throughput),
+                '#AA96DA',
+                `${latest.throughput || 0} t/hr`
+              )
+            );
+          }
+
+          const crusherChart = document.getElementById('chart-crusher-availability');
+          if (crusherChart) {
+            crusherChart.appendChild(
+              makeLineChart(
+                'Crusher Availability',
+                data.map(d => d.timestamp),
+                data.map(d => d.crusher_availability),
+                '#F67280',
+                `${latest.crusher_availability || 0} %`
+              )
+            );
+          }
+
+          const millChart = document.getElementById('chart-mill-vibration');
+          if (millChart) {
+            millChart.appendChild(
+              makeLineChart(
+                'Mill Vibration',
+                data.map(d => d.timestamp),
+                data.map(d => d.mill_vibration),
+                '#355C7D',
+                `${latest.mill_vibration || 0} dB`
+              )
+            );
+          }
+
+          const powerChart = document.getElementById('chart-power-consumption');
+          if (powerChart) {
+            powerChart.appendChild(
+              makeLineChart(
+                'Power Consumption',
+                data.map(d => d.timestamp),
+                data.map(d => d.fuel_consumption),
+                '#6bcB77',
+                `${latest.fuel_consumption || 0} kW`
+              )
+            );
+          }
+
+          const dumpChart = document.getElementById('chart-dump-trucks');
+          if (dumpChart) {
+            dumpChart.appendChild(
+              makeLineChart(
+                'Dump Trucks',
+                data.map(d => d.timestamp),
+                data.map(d => d.dump_trucks_utilization),
+                '#6bcB77',
+                `${latest.dump_trucks_utilization || 0} %`
+              )
+            );
+          }
+
+          const excChart = document.getElementById('chart-excavators');
+          if (excChart) {
+            excChart.appendChild(
+              makeLineChart(
+                'Excavators',
+                data.map(d => d.timestamp),
+                data.map(d => d.excavators_utilization),
+                '#AA96DA',
+                `${latest.excavators_utilization || 0} %`
+              )
+            );
+          }
+
+          const drillsChart = document.getElementById('chart-drills');
+          if (drillsChart) {
+            drillsChart.appendChild(
+              makeLineChart(
+                'Drills',
+                data.map(d => d.timestamp),
+                data.map(d => d.drills_utilization),
+                '#FFC300',
+                `${latest.drills_utilization || 0} %`
+              )
+            );
+          }
+
+          const ctxUtil = document.getElementById('utilizationChart').getContext('2d');
+          new Chart(ctxUtil, {
+            type: 'bar',
+            data: {
+              labels: ['Apr 10', 'Apr 11', 'Apr 12', 'Apr 13', 'Apr 14', 'Apr 15'],
+              datasets: [{
+                data: [8, 12, 16, 24, 21, 27],
+                backgroundColor: '#10b981',
+                borderRadius: 0,
+                barThickness: 12,
+              }]
+            },
+            options: {
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { display: false },
+                y: { beginAtZero: true, display: false }
               }
             }
-          };
+          });
 
-          createChart('chart-blast-areas', 'Active Blast Areas', 'active_blast_areas', '#ff6b6b', '');
-          createChart('chart-development-meters', 'Development Meters', 'development_meters', '#6bcB77', 'm');
-          createChart('chart-production-meters', 'Production Meters', 'production_meters', '#4D96FF', 'm');
-          createChart('chart-ore-mined', 'Ore Mined', 'ore_mined', '#FFC300', 'kt');
-          createChart('chart-throughput', 'Throughput', 'throughput', '#AA96DA', 't/hr');
-          createChart('chart-crusher-availability', 'Crusher Availability', 'crusher_availability', '#F67280', '%');
-          createChart('chart-mill-vibration', 'Mill Vibration', 'mill_vibration', '#355C7D', 'dB');
-          createChart('chart-power-consumption', 'Power Consumption', 'fuel_consumption', '#6bcB77', 'kW');
-          createChart('chart-dump-trucks', 'Dump Trucks', 'dump_trucks_utilization', '#6bcB77', '%');
-          createChart('chart-excavators', 'Excavators', 'excavators_utilization', '#AA96DA', '%');
-          createChart('chart-drills', 'Drills', 'drills_utilization', '#FFC300', '%');
+          const ctxPie = document.getElementById('explorationPie').getContext('2d');
+          new Chart(ctxPie, {
+            type: 'doughnut',
+            data: {
+              labels: ['Completed', 'Remaining'],
+              datasets: [{
+                data: [27, 73],
+                backgroundColor: ['#3b82f6', '#333333'],
+                borderWidth: 0
+              }]
+            },
+            options: {
+              cutout: '80%',
+              plugins: { legend: { display: false } }
+            }
+          });
 
-          const ctxUtil = document.getElementById('utilizationChart')?.getContext('2d');
-          if (ctxUtil) {
-            new Chart(ctxUtil, {
-              type: 'bar',
-              data: { labels: ['Apr 10', 'Apr 11', 'Apr 12', 'Apr 13', 'Apr 14', 'Apr 15'], datasets: [{ data: [8, 12, 16, 24, 21, 27], backgroundColor: '#10b981', borderRadius: 0, barThickness: 12 }] },
-              options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { beginAtZero: true, display: false } } }
-            });
-          }
-
-          const ctxPie = document.getElementById('explorationPie')?.getContext('2d');
-          if (ctxPie) {
-            new Chart(ctxPie, {
-              type: 'doughnut',
-              data: { labels: ['Completed', 'Remaining'], datasets: [{ data: [27, 73], backgroundColor: ['#3b82f6', '#333333'], borderWidth: 0 }] },
-              options: { cutout: '80%', plugins: { legend: { display: false } } }
-            });
-          }
-
-          const ctxProd = document.getElementById('productionChart')?.getContext('2d');
-          if (ctxProd) {
-            new Chart(ctxProd, {
-              type: 'bar',
-              data: { labels: ['Apr 10', 'Apr 11', 'Apr 12', 'Apr 13', 'Apr 14', 'Apr 15'], datasets: [{ data: [60, 100, 140, 180, 220, 270], backgroundColor: '#3b82f6', borderRadius: 4, barThickness: 14 }] },
-              options: { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#9ca3af' } }, y: { grid: { color: '#333333' }, ticks: { color: '#9ca3af' }, beginAtZero: true } } }
-            });
-          }
+          const ctxProd = document.getElementById('productionChart').getContext('2d');
+          new Chart(ctxProd, {
+            type: 'bar',
+            data: {
+              labels: ['Apr 10', 'Apr 11', 'Apr 12', 'Apr 13', 'Apr 14', 'Apr 15'],
+              datasets: [{
+                data: [60, 100, 140, 180, 220, 270],
+                backgroundColor: '#3b82f6',
+                borderRadius: 4,
+                barThickness: 14,
+              }]
+            },
+            options: {
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { grid: { display: false }, ticks: { color: '#9ca3af' } },
+                y: { grid: { color: '#333333' }, ticks: { color: '#9ca3af' }, beginAtZero: true }
+              }
+            }
+          });
         }, 0);
       }
 
       // ==================== DUMP PANEL ====================
       if (panelId === 'Dump') {
         grid.innerHTML = '';
-        
+
         const responsiveStyle = document.createElement('style');
         responsiveStyle.textContent = `
           .dump-row-container { width: 100%; display: flex; align-items: center; gap: 20px; flex-wrap: nowrap; }
@@ -1598,7 +1821,7 @@
         async function downloadDumpReport(range = 'daily') {
           if (window.isDownloading) return;
 
-          const excelUrl = range === 'daily' 
+          const excelUrl = range === 'daily'
             ? `${BASE_URL}/fetch-24hr-dump-data?company=${dumpCompany}&region=${encodeURIComponent(dumpRegion)}`
             : `${BASE_URL}/fetch-monthly-dump-data?company=${dumpCompany}&sector=${dumpSector}&region=${encodeURIComponent(dumpRegion)}&range=monthly`;
 
@@ -1746,13 +1969,13 @@
 
         const elements = {};
         const elementIds = [
-          'buttonScreen', 'fullscreenContent', 'liveBtn', 'modelBtn', 'backBtn', 
+          'buttonScreen', 'fullscreenContent', 'liveBtn', 'modelBtn', 'backBtn',
           'liveContainer', 'modelContainer', 'streamImage', 'streamStatus', 'lastUpdated',
           'fullscreenLastUpdated', 'viewTitle', 'drone3D', 'loading3D', 'controlsInfo',
-          'videoControls', 'playPauseBtn', 'rotateBtn', 'zoomInBtn', 'zoomOutBtn', 
+          'videoControls', 'playPauseBtn', 'rotateBtn', 'zoomInBtn', 'zoomOutBtn',
           'zoomResetBtn', 'timeDisplay', 'zoomLevelDisplay', 'touchOverlay'
         ];
-        
+
         elementIds.forEach(id => elements[id] = container.querySelector(`#${id}`));
         if (elements.streamStatus) {
           elements.statusText = elements.streamStatus.querySelector('.status-text');
@@ -1767,28 +1990,28 @@
         const showView = view => {
           if (state.currentView === view) return;
           state.currentView = view;
-          
+
           elements.buttonScreen?.classList.remove('active');
           elements.fullscreenContent?.classList.add('active');
-          
+
           if (view === 'live') {
             if (elements.viewTitle) elements.viewTitle.textContent = 'LIVE VIDEO STREAM';
             elements.liveContainer?.classList.add('active');
             elements.modelContainer?.classList.remove('active');
-            
+
             state.isRotated = false;
             updateRotateButton();
             if (elements.streamImage) {
               elements.streamImage.classList.remove('rotated');
               elements.streamImage.parentElement?.classList.remove('rotated');
             }
-            
+
             state.isStreamPaused = false;
             state.zoomLevel = 1;
             updatePlayPauseButton();
             updateZoomButtons();
             if (elements.streamImage) elements.streamImage.style.transform = 'scale(1)';
-            
+
             if (elements.videoControls) elements.videoControls.style.display = 'flex';
             if (elements.touchOverlay) elements.touchOverlay.style.display = 'block';
             showControls();
@@ -1797,10 +2020,10 @@
             if (elements.viewTitle) elements.viewTitle.textContent = '3D MODEL VIEWER';
             elements.liveContainer?.classList.remove('active');
             elements.modelContainer?.classList.add('active');
-            
+
             if (elements.videoControls) elements.videoControls.style.display = 'none';
             if (elements.touchOverlay) elements.touchOverlay.style.display = 'none';
-            
+
             stopStream();
             if (!state.threeJsInitialized) initDrone3DViewer();
           }
@@ -1810,7 +2033,7 @@
         const goBackDrone = () => {
           elements.fullscreenContent?.classList.remove('active');
           elements.buttonScreen?.classList.add('active');
-          
+
           if (state.currentView === 'live') {
             stopStream();
             state.zoomLevel = 1;
@@ -1823,11 +2046,11 @@
             state.isRotated = false;
             updateRotateButton();
           }
-          
+
           elements.liveContainer?.classList.remove('active');
           elements.modelContainer?.classList.remove('active');
           state.currentView = null;
-          
+
           clearTimeout(state.controlsTimeout);
           clearTimeout(state.zoomTimeout);
           state.controlsTimeout = state.zoomTimeout = null;
@@ -1859,12 +2082,12 @@
             elements.zoomLevelDisplay.textContent = `${Math.round(state.zoomLevel * 100)}%`;
             elements.zoomLevelDisplay.classList.add('active');
           }
-          
+
           clearTimeout(state.zoomTimeout);
           state.zoomTimeout = setTimeout(() => {
             if (elements.zoomLevelDisplay) elements.zoomLevelDisplay.classList.remove('active');
           }, 1000);
-          
+
           showControls();
         };
 
@@ -1899,7 +2122,7 @@
             const currentDistance = getDistance(e.touches[0], e.touches[1]);
             const scale = currentDistance / state.initialDistance;
             const newZoom = state.initialZoom * scale;
-            
+
             state.zoomLevel = Math.max(state.minZoom, Math.min(state.maxZoom, newZoom));
             applyZoom();
           }
@@ -1921,19 +2144,19 @@
           if (elements.statusIndicator) elements.statusIndicator.style.backgroundColor = '#ffa500';
           if (elements.statusText) elements.statusText.textContent = 'Connecting to live stream...';
           if (elements.streamStatus) elements.streamStatus.style.display = 'flex';
-          
+
           const loadStream = () => {
             if (state.isStreamPaused) return;
-            
+
             state.lastStreamUrl = "https://myservice.taileb4769.ts.net/stream?" + Date.now();
             if (elements.streamImage) elements.streamImage.src = state.lastStreamUrl;
           };
-          
+
           loadStream();
-          
+
           if (state.streamInterval) clearInterval(state.streamInterval);
           state.streamInterval = setInterval(loadStream, 45000);
-          
+
           if (elements.streamImage) {
             elements.streamImage.onload = () => {
               if (elements.statusIndicator) elements.statusIndicator.style.backgroundColor = '#4caf50';
@@ -1947,7 +2170,7 @@
                 }
               }, 2000);
             };
-            
+
             elements.streamImage.onerror = () => {
               console.log("Stream disconnected. Reconnecting...");
               if (elements.statusIndicator) elements.statusIndicator.style.backgroundColor = '#f44336';
@@ -1956,7 +2179,7 @@
                 elements.streamStatus.style.display = 'flex';
                 elements.streamStatus.style.opacity = '1';
               }
-              
+
               if (!state.isStreamPaused) {
                 setTimeout(() => loadStream(), 2000);
               }
@@ -1977,7 +2200,7 @@
         const toggleStreamPause = () => {
           state.isStreamPaused = !state.isStreamPaused;
           updatePlayPauseButton();
-          
+
           if (state.isStreamPaused) {
             if (elements.streamImage) elements.streamImage.src = '';
             if (state.streamInterval) {
@@ -2008,10 +2231,10 @@
         const toggleRotateView = () => {
           state.isRotated = !state.isRotated;
           updateRotateButton();
-          
+
           const videoContainer = elements.streamImage?.parentElement;
           const img = elements.streamImage;
-          
+
           if (state.isRotated) {
             videoContainer?.classList.add('rotated');
             img?.classList.add('rotated');
@@ -2019,7 +2242,7 @@
             videoContainer?.classList.remove('rotated');
             img?.classList.remove('rotated');
           }
-          
+
           setTimeout(() => window.dispatchEvent(new Event('resize')), 10);
         };
 
@@ -2040,7 +2263,7 @@
         const showControls = () => {
           state.controlsVisible = true;
           if (elements.videoControls) elements.videoControls.style.opacity = '1';
-          
+
           if (state.controlsTimeout) clearTimeout(state.controlsTimeout);
           state.controlsTimeout = setTimeout(hideControls, 3000);
         };
@@ -2057,10 +2280,10 @@
 
         const initDrone3DViewer = () => {
           if (state.threeJsInitialized) return;
-          
+
           if (elements.loading3D) elements.loading3D.style.display = 'flex';
           if (elements.loadingText) elements.loadingText.textContent = 'Loading 3D library...';
-          
+
           const handleError = () => {
             if (elements.loadingText) elements.loadingText.textContent = 'Error loading 3D components';
             if (elements.loading3D) elements.loading3D.style.backgroundColor = 'rgba(244, 67, 54, 0.8)';
@@ -2077,7 +2300,7 @@
           const initializeThreeJS = () => {
             try {
               if (elements.loadingText) elements.loadingText.textContent = 'Initializing 3D scene...';
-              
+
               const scene = new THREE.Scene();
               scene.background = new THREE.Color(0x000000);
 
@@ -2088,8 +2311,8 @@
               );
               camera.position.set(0, 1, 3);
 
-              state.renderer = new THREE.WebGLRenderer({ 
-                canvas: elements.drone3D, 
+              state.renderer = new THREE.WebGLRenderer({
+                canvas: elements.drone3D,
                 antialias: true,
                 alpha: true,
                 powerPreference: "high-performance"
@@ -2098,7 +2321,7 @@
               if (elements.drone3D) {
                 state.renderer.setSize(elements.drone3D.clientWidth, elements.drone3D.clientHeight, false);
               }
-              
+
               if (elements.drone3D) {
                 elements.drone3D.style.touchAction = 'none';
                 elements.drone3D.style.userSelect = 'none';
@@ -2109,7 +2332,7 @@
               const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
               dirLight1.position.set(5, 10, 7);
               scene.add(dirLight1);
-              
+
               const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
               dirLight2.position.set(-5, -10, -7);
               scene.add(dirLight2);
@@ -2186,7 +2409,7 @@
                 state.controls?.update();
                 if (state.renderer && scene && camera) state.renderer.render(scene, camera);
               }
-              
+
               animate();
 
               function handleResize() {
@@ -2201,15 +2424,15 @@
                 }
                 if (state.controls) state.controls.update();
               }
-              
+
               let resizeTimeout;
               function debouncedResize() {
                 clearTimeout(resizeTimeout);
                 resizeTimeout = setTimeout(handleResize, 250);
               }
-              
+
               window.addEventListener('resize', debouncedResize);
-              
+
               const resizeObserver = new ResizeObserver(debouncedResize);
               if (elements.drone3D?.parentElement) {
                 resizeObserver.observe(elements.drone3D.parentElement);
@@ -2223,7 +2446,7 @@
                 if (state.renderer) state.renderer.dispose();
                 state.threeJsInitialized = false;
               };
-              
+
             } catch (error) {
               console.error('Error initializing 3D scene:', error);
               if (elements.loadingText) elements.loadingText.textContent = 'Error initializing 3D viewer';
@@ -2251,7 +2474,7 @@
         if (elements.liveBtn) elements.liveBtn.addEventListener('click', () => showView('live'));
         if (elements.modelBtn) elements.modelBtn.addEventListener('click', () => showView('model'));
         if (elements.backBtn) elements.backBtn.addEventListener('click', goBackDrone);
-        
+
         if (elements.playPauseBtn) {
           elements.playPauseBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -2259,7 +2482,7 @@
             showControls();
           });
         }
-        
+
         if (elements.rotateBtn) {
           elements.rotateBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -2267,38 +2490,38 @@
             showControls();
           });
         }
-        
+
         if (elements.zoomInBtn) {
           elements.zoomInBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             zoomIn();
           });
         }
-        
+
         if (elements.zoomOutBtn) {
           elements.zoomOutBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             zoomOut();
           });
         }
-        
+
         if (elements.zoomResetBtn) {
           elements.zoomResetBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             resetZoom();
           });
         }
-        
+
         if (elements.touchOverlay) {
           elements.touchOverlay.addEventListener('click', toggleControls);
         }
-        
+
         if (elements.streamImage) {
           elements.streamImage.addEventListener('touchstart', handleTouchStart, { passive: false });
           elements.streamImage.addEventListener('touchmove', handleTouchMove, { passive: false });
           elements.streamImage.addEventListener('touchend', handleTouchEnd);
         }
-        
+
         if (elements.liveContainer) {
           elements.liveContainer.addEventListener('mousemove', () => {
             if (state.currentView === 'live') showControls();
@@ -2323,7 +2546,7 @@
         container.cleanupDronePanel = () => {
           stopStream();
           if (state.threeJSCleanup) state.threeJSCleanup();
-          
+
           if (elements.liveBtn) elements.liveBtn.removeEventListener('click', () => showView('live'));
           if (elements.modelBtn) elements.modelBtn.removeEventListener('click', () => showView('model'));
           if (elements.backBtn) elements.backBtn.removeEventListener('click', goBackDrone);
@@ -2339,14 +2562,14 @@
             elements.streamImage.removeEventListener('touchend', handleTouchEnd);
           }
           if (elements.liveContainer) {
-            elements.liveContainer.removeEventListener('mousemove', () => {});
-            elements.liveContainer.removeEventListener('mouseleave', () => {});
+            elements.liveContainer.removeEventListener('mousemove', () => { });
+            elements.liveContainer.removeEventListener('mouseleave', () => { });
           }
           if (elements.drone3D) {
-            elements.drone3D.removeEventListener('touchstart', (e) => {});
-            elements.drone3D.removeEventListener('touchmove', (e) => {});
+            elements.drone3D.removeEventListener('touchstart', (e) => { });
+            elements.drone3D.removeEventListener('touchmove', (e) => { });
           }
-          
+
           clearTimeout(state.controlsTimeout);
           clearTimeout(state.zoomTimeout);
         };
@@ -2437,9 +2660,10 @@
         document.head.appendChild(style);
       }
 
-      // ==================== FUEL PANEL ====================
+      // ==================== FUEL PANEL (DYNAMIC FOR BOTH KACHE AND VELASTRA) ====================
       if (panelId === 'Fuel') {
         console.log('Raw data for Fuel panel:', data);
+        console.log('Current region:', region);
 
         grid.innerHTML = '';
 
@@ -2452,11 +2676,14 @@
         routeContainer.id = "routeContainer";
         routeContainer.style.cssText = `display: grid; grid-template-columns: 330px 330px; gap: 10px; width: 100%; justify-content: start;`;
 
+        // Set map label based on region
+        const mapLabelText = region === 'Velastra' ? 'Coal Haul Simulation - Velastra' : 'Coal Haul Simulation - Dalli Rajhara';
+
         routeContainer.innerHTML = `
           <div id="mapWrapper" style="position: relative; background: white;">
             <div id="routeMap" style="height: 300px; width: 320px; background: white;"></div>
             <div id="mapLabel" style="background: rgba(255,255,255,0.9); color: #333; padding: 8px 12px; border-radius: 5px; border: 1px solid #6ff3d6; font-weight: bold;">
-              Coal Haul Simulation - Dalli Rajhara
+              ${mapLabelText}
             </div>
           </div>
         `;
@@ -2475,10 +2702,11 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
               <strong style="color: #fff;">Hauler and Excavator Summary</strong>
               <select id="haulerSelector" style="background: #0a1920; color: #6ff3d6; border: 1px solid #6ff3d6; border-radius: 4px; padding: 4px 8px; font-size: 12px; font-weight: bold; cursor: pointer;">
-                <option value="D8">D8</option>
-                <option value="D9">D9</option>
-                <option value="D3">D3</option>
-                <option value="D12">D12</option>
+                <option value="D3">25</option>
+                <option value="D8">97</option>
+                <option value="D9">12</option>
+                <option value="D7">07</option>
+                <option value="D14">14</option>
                 <option value="all">All Haulers</option>
               </select>
             </div>
@@ -2539,7 +2767,8 @@
         `;
         document.head.appendChild(style);
 
-        initializeWhiteMapSimulation();
+        // Initialize the dynamic map simulation based on region
+        initializeDynamicMapSimulation();
       }
 
       // ==================== OTHER PANELS ====================
@@ -2589,7 +2818,7 @@
             <div class="card1"><div class="section-title">Offshore Wells</div><div class="value-label"><span>Tubing Pressure</span><span>3.460 psi</span></div><div class="tiny-chart"><canvas id="chart7"></canvas></div><div class="value-label"><span>Pump Failure Probability</span><span>3%</span></div><div class="tiny-chart"><canvas id="chart8"></canvas></div></div>
           </div>
         `;
-        
+
         setTimeout(() => {
           const chartConfigs = [
             { id: 'chart-opencut-grade', data: [1.1, 1.15, 1.18, 1.20, 1.19], label: 'Opencut Grade', unit: '%' },
@@ -2823,7 +3052,7 @@
       }
       html += `<canvas></canvas>`;
       div.innerHTML = html;
-      
+
       const formattedLabels = labels.map(label => {
         const date = new Date(label);
         if (isNaN(date)) return label;
@@ -2832,7 +3061,7 @@
         const seconds = String(date.getSeconds()).padStart(2, '0');
         return `${hours}:${minutes}:${seconds}`;
       });
-      
+
       const ctx = div.querySelector('canvas').getContext('2d');
       new Chart(ctx, {
         type: 'line',
@@ -2853,10 +3082,10 @@
     // ==================== FUEL CHART FUNCTIONS ====================
     const fuelChartManager = {
       currentChart: null, chartIdCounter: 0, lastDataHash: {},
-      destroyCurrentChart: function() {
-        if (this.currentChart) { try { this.currentChart.destroy(); } catch (e) {} this.currentChart = null; }
+      destroyCurrentChart: function () {
+        if (this.currentChart) { try { this.currentChart.destroy(); } catch (e) { } this.currentChart = null; }
       },
-      createNewChart: function(canvasId, config) {
+      createNewChart: function (canvasId, config) {
         this.destroyCurrentChart();
         const existingCanvas = document.getElementById(canvasId);
         if (existingCanvas && existingCanvas.parentNode) existingCanvas.parentNode.removeChild(existingCanvas);
@@ -2868,56 +3097,55 @@
         this.currentChart = new Chart(ctx, config);
         return this.currentChart;
       },
-      generateFuelDataHash: function(data, haulerId) {
+      generateFuelDataHash: function (data, haulerId) {
         if (!data || !Array.isArray(data) || data.length === 0) return '';
         return data.map(row => `${row.timestamp}:${row.z_axis}`).join('|');
       }
     };
 
-// Replace renderFuelGradientForHauler with this:
     async function renderFuelGradientForHauler(haulerId, forceRefresh = false) {
       try {
         const chartContainer = document.getElementById('fuelChartContainer');
         const selectedHaulerFuelChart = document.getElementById('selectedHaulerFuelChart');
         const fuelChartHaulerName = document.getElementById('fuelChartHaulerName');
-        
+
         if (!chartContainer || !selectedHaulerFuelChart) return;
-        
+
         const displayName = getDisplayName(haulerId);
         selectedHaulerFuelChart.style.display = 'block';
         if (fuelChartHaulerName) fuelChartHaulerName.textContent = `${haulerId === 'D7' ? 'Excavator' : 'Hauler'}: ${displayName}`;
-        
+
         // Show loading
         chartContainer.innerHTML = '<div style="color: #6ff3d6; text-align: center; padding: 20px;">Loading fuel data...</div>';
-        
-        // ✅ USE EXISTING fetchDashboardDataby DATA
+
+        // USE EXISTING fetchDashboardDataby DATA
         const mainData = await fetchData();
-        
+
         if (!mainData || mainData.length === 0) {
           throw new Error('No data available');
         }
-        
+
         // Filter data for this hauler
         const haulerData = mainData.filter(d => d.device_id === haulerId);
-        
+
         if (haulerData.length === 0) {
           chartContainer.innerHTML = `<div style="color: #ccc; text-align: center; padding: 20px;">No data for ${displayName}</div>`;
           return;
         }
-        
+
         // Get last 10 records (sort by timestamp)
         const sortedData = [...haulerData].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         const recentData = sortedData.slice(0, 10);
-        
+
         // Extract pitch and calculate fuel
         const timestamps = recentData.map(d => d.timestamp);
         const pitchValues = recentData.map(d => parseFloat(d.pitch) || 0);
-        
-        // Calculate fuel consumption based on pitch (your existing formula)
+
+        // Calculate fuel consumption based on pitch
         const baselineKmpl = haulerId === 'D7' ? 0.8 : 1.5;
         const FC0 = 100 * baselineKmpl;
         const fuelValues = pitchValues.map(p => FC0 * (1 + 0.1 * Math.sin(p * Math.PI / 180)));
-        
+
         // Format timestamps for display
         const labels = timestamps.map(t => {
           try {
@@ -2927,7 +3155,7 @@
             return t;
           }
         });
-        
+
         // Colors based on hauler type
         const colors = {
           'D7': { fuel: '#FF5722', gradient: '#FF9800' },
@@ -2935,18 +3163,19 @@
           'D8': { fuel: '#4CAF50', gradient: '#81C784' },
           'D9': { fuel: '#9C27B0', gradient: '#BA68C8' },
           'D12': { fuel: '#FF9F40', gradient: '#FFB74D' },
+          'D14': { fuel: '#9C27B0', gradient: '#BA68C8' },
           'default': { fuel: '#36a2eb', gradient: '#32cd32' }
         };
-        
+
         const colorSet = colors[haulerId] || colors.default;
-        
+
         // Clear loading and create chart
         chartContainer.innerHTML = '';
         const canvas = document.createElement('canvas');
         canvas.id = `fuel-chart-${Date.now()}`;
         canvas.height = 180;
         chartContainer.appendChild(canvas);
-        
+
         new Chart(canvas.getContext('2d'), {
           type: 'line',
           data: {
@@ -2979,16 +3208,16 @@
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-              legend: { 
-                display: true, 
-                position: 'top', 
-                labels: { color: '#ccc', font: { size: 10 } } 
+              legend: {
+                display: true,
+                position: 'top',
+                labels: { color: '#ccc', font: { size: 10 } }
               },
               tooltip: {
                 mode: 'index',
                 intersect: false,
                 callbacks: {
-                  label: function(context) {
+                  label: function (context) {
                     if (context.datasetIndex === 0) {
                       return `Fuel: ${context.raw.toFixed(1)} L/100km`;
                     } else {
@@ -2999,9 +3228,9 @@
               }
             },
             scales: {
-              x: { 
-                ticks: { color: '#ccc', font: { size: 10 } }, 
-                grid: { color: '#1e3a47' } 
+              x: {
+                ticks: { color: '#ccc', font: { size: 10 } },
+                grid: { color: '#1e3a47' }
               },
               y: {
                 title: { display: true, text: 'Fuel (L/100km)', color: colorSet.fuel, font: { size: 11 } },
@@ -3017,7 +3246,7 @@
             }
           }
         });
-        
+
       } catch (err) {
         console.error('Error rendering fuel chart:', err);
         const chartContainer = document.getElementById('fuelChartContainer');
@@ -3027,27 +3256,26 @@
       }
     }
 
-    // Replace renderAllHaulersFuelChart with this:
     async function renderAllHaulersFuelChart(forceRefresh = false) {
       try {
         const chartContainer = document.getElementById('fuelChartContainer');
         const selectedHaulerFuelChart = document.getElementById('selectedHaulerFuelChart');
         const fuelChartHaulerName = document.getElementById('fuelChartHaulerName');
-        
+
         if (!chartContainer || !selectedHaulerFuelChart) return;
-        
+
         selectedHaulerFuelChart.style.display = 'block';
         if (fuelChartHaulerName) fuelChartHaulerName.textContent = 'All Vehicles - Fuel Comparison';
-        
+
         chartContainer.innerHTML = '<div style="color: #6ff3d6; text-align: center; padding: 20px;">Loading fuel data...</div>';
-        
-        // ✅ USE EXISTING fetchDashboardDataby DATA
+
+        // USE EXISTING fetchDashboardDataby DATA
         const mainData = await fetchData();
-        
+
         if (!mainData || mainData.length === 0) {
           throw new Error('No data available');
         }
-        
+
         // Group by device_id and get latest 5 for each
         const deviceMap = {};
         mainData.forEach(d => {
@@ -3056,34 +3284,34 @@
           }
           deviceMap[d.device_id].push(d);
         });
-        
+
         // Sort each device's data by timestamp and take latest 5
-        const haulers = ['D3', 'D7', 'D8', 'D9', 'D12'].filter(id => deviceMap[id] && deviceMap[id].length > 0);
-        
+        const haulers = ['D3', 'D7', 'D8', 'D9', 'D12', 'D14'].filter(id => deviceMap[id] && deviceMap[id].length > 0);
+
         if (haulers.length === 0) {
           chartContainer.innerHTML = '<div style="color: #ccc; text-align: center; padding: 20px;">No vehicle data available</div>';
           return;
         }
-        
+
         const datasets = [];
         const colors = {
-          'D3': '#2196F3', 'D7': '#FF5722', 'D8': '#4CAF50', 'D9': '#9C27B0', 'D12': '#FF9F40'
+          'D3': '#2196F3', 'D7': '#FF5722', 'D8': '#4CAF50', 'D9': '#9C27B0', 'D12': '#FF9F40', 'D14': '#9C27B0'
         };
-        
+
         let allLabels = [];
-        
+
         haulers.forEach(hauler => {
           // Sort by timestamp descending and take latest 5
           const sortedData = [...deviceMap[hauler]].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
           const recentData = sortedData.slice(0, 5);
-          
+
           const timestamps = recentData.map(d => d.timestamp);
           const pitchValues = recentData.map(d => parseFloat(d.pitch) || 0);
-          
+
           const baselineKmpl = hauler === 'D7' ? 0.8 : 1.5;
           const FC0 = 100 * baselineKmpl;
           const fuelValues = pitchValues.map(p => FC0 * (1 + 0.1 * Math.sin(p * Math.PI / 180)));
-          
+
           if (allLabels.length === 0) {
             allLabels = timestamps.map(t => {
               try {
@@ -3094,10 +3322,10 @@
               }
             });
           }
-          
+
           const labelPrefix = hauler === 'D7' ? 'Excavator' : 'Hauler';
           const displayName = getDisplayName(hauler);
-          
+
           datasets.push({
             label: `${labelPrefix} ${displayName}`,
             data: fuelValues,
@@ -3109,37 +3337,37 @@
             pointRadius: 3
           });
         });
-        
+
         chartContainer.innerHTML = '';
         const canvas = document.createElement('canvas');
         canvas.id = `all-chart-${Date.now()}`;
         canvas.height = 180;
         chartContainer.appendChild(canvas);
-        
+
         new Chart(canvas.getContext('2d'), {
           type: 'line',
-          data: { 
-            labels: allLabels, 
-            datasets: datasets 
+          data: {
+            labels: allLabels,
+            datasets: datasets
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-              legend: { 
-                display: true, 
-                position: 'top', 
-                labels: { color: '#ccc', font: { size: 9 } } 
+              legend: {
+                display: true,
+                position: 'top',
+                labels: { color: '#ccc', font: { size: 9 } }
               },
-              tooltip: { 
-                mode: 'index', 
-                intersect: false 
+              tooltip: {
+                mode: 'index',
+                intersect: false
               }
             },
             scales: {
-              x: { 
-                ticks: { color: '#ccc' }, 
-                grid: { color: '#1e3a47' } 
+              x: {
+                ticks: { color: '#ccc' },
+                grid: { color: '#1e3a47' }
               },
               y: {
                 title: { display: true, text: 'Fuel (L/100km)', color: '#ccc' },
@@ -3149,7 +3377,7 @@
             }
           }
         });
-        
+
       } catch (err) {
         console.error('Error rendering all haulers chart:', err);
         const chartContainer = document.getElementById('fuelChartContainer');
@@ -3158,15 +3386,22 @@
         }
       }
     }
-   
+
     window.renderFuelGradientForHauler = renderFuelGradientForHauler;
     window.renderAllHaulersFuelChart = renderAllHaulersFuelChart;
 
-    // ==================== WHITE MAP SIMULATION ====================
-    async function initializeWhiteMapSimulation() {
-      console.trace('initializeWhiteMapSimulation called');
+    // ==================== DYNAMIC MAP SIMULATION FOR BOTH REGIONS ====================
+    async function initializeDynamicMapSimulation() {
+      console.trace('initializeDynamicMapSimulation called for region:', region);
 
-      const deviceDisplayNames = { 'D3': '25', 'D8': '97', 'D9': '12' };
+      const deviceDisplayNames = {
+        'D3': '25',
+        'D8': '97',
+        'D9': '12',
+        'D7': '07',
+        'D12': '12',
+        'D14': '14'
+      };
 
       function getDisplayName(deviceId) {
         return deviceDisplayNames[deviceId] || deviceId;
@@ -3182,7 +3417,7 @@
       console.log('Device mapping:', deviceDisplayNames);
 
       setTimeout(async () => {
-        console.log('Initializing white map simulation...');
+        console.log('Initializing dynamic map simulation for region:', region);
 
         const mapContainer = document.getElementById('routeMap');
         if (!mapContainer) {
@@ -3199,8 +3434,8 @@
           const dLon = toRad(coord2[1] - coord1[1]);
           const lat1 = toRad(coord1[0]);
           const lat2 = toRad(coord2[0]);
-          const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
           return R * c;
         }
 
@@ -3221,23 +3456,17 @@
         function getVibrationLabel(vibrationValue) {
           const vib = Number(vibrationValue);
           if (Number.isNaN(vib)) return 'UNKNOWN';
-          switch(vib) {
-            case 1: return 'VERY LOW';
-            case 2: return 'LOW';
-            case 3: return 'MIDDLE';
-            case 4: return 'HIGH';
-            case 5: return 'VERY HIGH';
-            default: return 'UNKNOWN';
-          }
+          if (vib <= 2) return 'LOW';
+          else if (vib <= 4) return 'MEDIUM';
+          else return 'HIGH';
         }
 
         function detectExcavatorState(vibrationValue, pitchValue) {
           const vib = Number(vibrationValue);
           if (Number.isNaN(vib)) return 'UNKNOWN';
           if (vib <= 2) return 'IDLE';
-          else if (vib === 3) return 'OPERATING';
-          else if (vib >= 4) return 'LOADING';
-          return 'UNKNOWN';
+          else if (vib <= 4) return 'OPERATING';
+          else return 'LOADING';
         }
 
         function get24HourPathHistory(haulerId) {
@@ -3258,18 +3487,18 @@
           if (!segments || segments.length < 2) {
             return { total: 0, totalDistance: 0, flatSegments: 0, gradientSegments: 0, gradient5to30: 0, gradient30to50: 0, gradientAbove50: 0, flatDistance: 0, gradientDistance: 0, gradient5to30Distance: 0, gradient30to50Distance: 0, gradientAbove50Distance: 0, is24Hour: true, dataPoints: 0 };
           }
-          
+
           let totalDistance = 0, segmentCount = 0, flatSegments = 0, gradientSegments = 0;
           let gradient5to30 = 0, gradient30to50 = 0, gradientAbove50 = 0;
           let flatDistance = 0, gradientDistance = 0, gradient5to30Distance = 0, gradient30to50Distance = 0, gradientAbove50Distance = 0;
-          
+
           for (let i = 1; i < segments.length; i++) {
-            const calc = calculateSegmentDistance(segments[i-1], segments[i]);
+            const calc = calculateSegmentDistance(segments[i - 1], segments[i]);
             totalDistance += calc.distance;
             segmentCount++;
-            
+
             const pitch = Math.abs(segments[i].pitch || 0);
-            
+
             if (pitch <= 5) {
               flatSegments++;
               flatDistance += calc.distance;
@@ -3281,7 +3510,7 @@
               else if (pitch > 50) { gradientAbove50++; gradientAbove50Distance += calc.distance; }
             }
           }
-          
+
           return {
             total: segmentCount, totalDistance: totalDistance,
             flatSegments: flatSegments, gradientSegments: gradientSegments,
@@ -3297,27 +3526,27 @@
           if (!segments || segments.length < 2) return 0;
           let totalDistance = 0;
           for (let i = 1; i < segments.length; i++) {
-            totalDistance += haversineKm(segments[i-1].pos, segments[i].pos);
+            totalDistance += haversineKm(segments[i - 1].pos, segments[i].pos);
           }
           return totalDistance;
         }
 
-        const PATH_HISTORY_KEY = 'hauler_path_history';
-        
+        const PATH_HISTORY_KEY = `hauler_path_history_${region}`;
+
         function loadPathHistory() {
           try {
             const stored = localStorage.getItem(PATH_HISTORY_KEY);
             if (stored) return JSON.parse(stored);
-          } catch(e) {}
+          } catch (e) { }
           return {};
         }
-        
+
         function savePathHistory(history) {
           try {
             localStorage.setItem(PATH_HISTORY_KEY, JSON.stringify(history));
-          } catch(e) {}
+          } catch (e) { }
         }
-        
+
         function cleanOldPathHistory(history) {
           const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
           for (const haulerId in history) {
@@ -3327,40 +3556,165 @@
         }
 
         async function fetchBackendData() {
-          const backendUrl = `${BASE_URL}/fetchDashboardDataby?company=TMC&sector=Mining&region=Kache`;
+          const backendUrl = `${BASE_URL}/fetchDashboardDataby?company=${encodeURIComponent(company)}&sector=${encodeURIComponent(sector)}&region=${encodeURIComponent(region)}`;
           try {
             const resp = await fetch(backendUrl);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const json = await resp.json();
-            
-            if (json.status === 'success' && json.devices) {
+
+            console.log("Backend response for", region, ":", json);
+
+            if (json.status === 'success') {
               const transformedData = { sites: {} };
-              json.devices.forEach(device => {
-                if (device.device_id) {
-                  transformedData.sites[device.device_id] = {
-                    id: device.device_id,
-                    pos: [device.latitude, device.longitude],
-                    timestamp: device.timestamp,
-                    altitude: device.altitude,
-                    pitch: device.pitch,
-                    roll: device.roll,
-                    vibration: device.vibration,
-                    movement: device.movement,
-                    load: device.load || 0,
-                    speed: device.speed || 0,
-                    rl: device.rl || (device.altitude ? device.altitude + 525.5 : 525.5)
-                  };
+
+              // CASE 1: Source is 'realtime_sensor_data' - devices array contains objects
+              if (json.source === 'realtime_sensor_data' && json.devices && Array.isArray(json.devices)) {
+                console.log('Processing realtime sensor data for', region);
+
+                json.devices.forEach(device => {
+                  if (device.device_id) {
+                    // Check if device has valid coordinates
+                    const hasValidCoords = device.latitude && device.longitude &&
+                      !isNaN(parseFloat(device.latitude)) &&
+                      !isNaN(parseFloat(device.longitude)) &&
+                      parseFloat(device.latitude) !== 0 &&
+                      parseFloat(device.longitude) !== 0;
+
+                    if (hasValidCoords) {
+                      transformedData.sites[device.device_id] = {
+                        id: device.device_id,
+                        pos: [parseFloat(device.latitude), parseFloat(device.longitude)],
+                        timestamp: device.timestamp || new Date().toISOString(),
+                        altitude: device.altitude ? parseFloat(device.altitude) : 0,
+                        pitch: device.pitch ? parseFloat(device.pitch) : 0,
+                        roll: device.roll ? parseFloat(device.roll) : 0,
+                        vibration: device.vibration ? parseFloat(device.vibration) : 0,
+                        movement: device.movement || 'STABLE',
+                        load: device.load ? parseFloat(device.load) : 0,
+                        speed: device.speed ? parseFloat(device.speed) : 0,
+                        rl: device.altitude ? parseFloat(device.altitude) + 525.5 : 525.5
+                      };
+                      console.log(`✅ Added ${device.device_id} with real coordinates:`, [device.latitude, device.longitude]);
+                    } else {
+                      console.log(`⚠️ Skipping ${device.device_id} - no valid coordinates`);
+                    }
+                  }
+                });
+              }
+              // CASE 2: Source is 'dummy' 
+              else if (json.source === 'dummy' && json.devices && Array.isArray(json.devices) && json.data && Array.isArray(json.data)) {
+                console.log('Processing dummy data for', region);
+
+                // Create a map of device_id to its latest data record
+                const deviceDataMap = {};
+
+                json.data.forEach(record => {
+                  if (record.device_id && !deviceDataMap[record.device_id]) {
+                    deviceDataMap[record.device_id] = record;
+                  }
+                });
+
+                // Now create sites for each device - ONLY if they have coordinates
+                json.devices.forEach(deviceId => {
+                  const record = deviceDataMap[deviceId] || {};
+
+                  // Check if record has valid coordinates
+                  const hasValidCoords = record.latitude && record.longitude &&
+                    !isNaN(parseFloat(record.latitude)) &&
+                    !isNaN(parseFloat(record.longitude)) &&
+                    parseFloat(record.latitude) !== 0 &&
+                    parseFloat(record.longitude) !== 0;
+
+                  if (hasValidCoords) {
+                    transformedData.sites[deviceId] = {
+                      id: deviceId,
+                      pos: [parseFloat(record.latitude), parseFloat(record.longitude)],
+                      timestamp: record.timestamp || new Date().toISOString(),
+                      altitude: record.altitude ? parseFloat(record.altitude) : 0,
+                      pitch: record.pitch ? parseFloat(record.pitch) : 0,
+                      roll: record.roll ? parseFloat(record.roll) : 0,
+                      vibration: record.vibration ? parseFloat(record.vibration) : 0,
+                      movement: record.movement || 'STABLE',
+                      load: record.load ? parseFloat(record.load) : 0,
+                      speed: record.speed ? parseFloat(record.speed) : 0,
+                      rl: record.altitude ? parseFloat(record.altitude) + 525.5 : 525.5
+                    };
+                    console.log(`✅ Added ${deviceId} with real coordinates:`, [record.latitude, record.longitude]);
+                  } else {
+                    console.log(`⚠️ Skipping ${deviceId} - no valid coordinates in dummy data`);
+                  }
+                });
+              }
+              // CASE 3: Legacy format - devices array contains objects
+              else if (json.devices && Array.isArray(json.devices)) {
+                if (json.devices.length > 0 && typeof json.devices[0] === 'object') {
+                  json.devices.forEach(device => {
+                    if (device.device_id) {
+                      const hasValidCoords = device.latitude && device.longitude &&
+                        !isNaN(parseFloat(device.latitude)) &&
+                        !isNaN(parseFloat(device.longitude)) &&
+                        parseFloat(device.latitude) !== 0 &&
+                        parseFloat(device.longitude) !== 0;
+
+                      if (hasValidCoords) {
+                        transformedData.sites[device.device_id] = {
+                          id: device.device_id,
+                          pos: [parseFloat(device.latitude), parseFloat(device.longitude)],
+                          timestamp: device.timestamp || new Date().toISOString(),
+                          altitude: device.altitude || 0,
+                          pitch: device.pitch || 0,
+                          roll: device.roll || 0,
+                          vibration: device.vibration || 0,
+                          movement: device.movement || 'STABLE',
+                          load: device.load || 0,
+                          speed: device.speed || 0,
+                          rl: device.rl || (device.altitude ? device.altitude + 525.5 : 525.5)
+                        };
+                      }
+                    }
+                  });
                 }
+              } else if (json.data && Array.isArray(json.data)) {
+                json.data.forEach(item => {
+                  if (item.device_id) {
+                    const hasValidCoords = item.latitude && item.longitude &&
+                      !isNaN(parseFloat(item.latitude)) &&
+                      !isNaN(parseFloat(item.longitude)) &&
+                      parseFloat(item.latitude) !== 0 &&
+                      parseFloat(item.longitude) !== 0;
+
+                    if (hasValidCoords) {
+                      transformedData.sites[item.device_id] = {
+                        id: item.device_id,
+                        pos: [parseFloat(item.latitude), parseFloat(item.longitude)],
+                        timestamp: item.timestamp || new Date().toISOString(),
+                        altitude: item.altitude || 0,
+                        pitch: item.pitch || 0,
+                        roll: item.roll || 0,
+                        vibration: item.vibration || 0,
+                        movement: item.movement || 'STABLE',
+                        load: item.load || 0,
+                        speed: item.speed || 0,
+                        rl: item.rl || (item.altitude ? item.altitude + 525.5 : 525.5)
+                      };
+                    }
+                  }
+                });
+              }
+
+              console.log(`Transformed data for ${region}:`, {
+                siteCount: Object.keys(transformedData.sites).length,
+                sites: transformedData.sites
               });
+
               return transformedData;
             }
             return { sites: {} };
           } catch (err) {
-            console.error('Failed to fetch backend data:', err);
+            console.error('Failed to fetch backend data for', region, ':', err);
             return { sites: {} };
           }
         }
-
         pathHistory = loadPathHistory();
         pathHistory = cleanOldPathHistory(pathHistory);
 
@@ -3368,10 +3722,10 @@
         try {
           backend = await fetchBackendData();
           if (!backend) {
-            console.error('Failed to get initial backend data');
+            console.error('Failed to get initial backend data for', region);
             return;
           }
-          console.log('Received backend payload:', backend);
+          console.log('Received backend payload for', region, ':', backend);
         } catch (err) {
           console.error('Failed to fetch backend data:', err);
           return;
@@ -3391,7 +3745,7 @@
           s.rl = s.altitude !== undefined && s.altitude !== null ? getRL(s.altitude) : FIXED_SEA_LEVEL_HEIGHT;
         });
 
-        console.log('Sites with RL values:', backend.sites);
+        console.log('Sites with RL values for', region, ':', backend.sites);
 
         function resolvePoint(pt) {
           if (!pt) return null;
@@ -3416,9 +3770,15 @@
           pathHistory[haulerId].forEach(point => allCoords.push(point.pos));
         }
 
+        // If no coordinates found, use default based on region
         if (allCoords.length === 0) {
-          console.error('No coordinates found in backend response.');
-          return;
+          console.warn('No coordinates found in backend response for', region, '. Using defaults.');
+          // Default coordinates for different regions
+          if (region === 'Kache') {
+            allCoords.push([12.9567, 77.73086]); // Dalli Rajhara default
+          } else if (region === 'Velastra') {
+            allCoords.push([23.5, 87.3]); // Velastra default coordinates
+          }
         }
 
         const avgLat = allCoords.reduce((s, c) => s + c[0], 0) / allCoords.length;
@@ -3463,7 +3823,25 @@
             };
           }
         }
+        // After creating sites object
+        console.log('📍 Sites created:', Object.keys(sites));
+        if (Object.keys(sites).length > 0) {
+          const defaultHauler = Object.keys(sites)[0];
+          console.log(`🎯 Default hauler for ${region}: ${defaultHauler}`);
 
+          // Draw with the correct default hauler
+          setTimeout(() => {
+            drawPathHistory(defaultHauler);
+
+            // Update dropdown to show correct default
+            const haulerSelector = document.getElementById('haulerSelector');
+            if (haulerSelector) {
+              haulerSelector.value = defaultHauler;
+            }
+          }, 100);
+        } else {
+          drawPathHistory('D3');
+        }
         const rlButtonStyle = `
           background: rgba(255,255,255,0.95);
           border: 2px solid #333;
@@ -3479,17 +3857,18 @@
         `;
 
         const pathPolylines = {}, pathMarkers = {}, pathSegments = {}, vehicleMarkers = {};
-        
+
         function getSegmentColor(segmentType) {
           return segmentType === 'flat' ? '#4CAF50' : '#FF9800';
         }
-        
+
         function getHaulerBaseColor(haulerId) {
-          switch(haulerId) {
+          switch (haulerId) {
             case 'D3': return '#2196F3';
             case 'D7': return '#FF5722';
             case 'D8': return '#4CAF50';
             case 'D9': return '#9C27B0';
+            case 'D14': return '#9C27B0';
             default: return '#9C27B0';
           }
         }
@@ -3499,8 +3878,9 @@
           if (pathHistory[haulerId] && pathHistory[haulerId].length > 0) return pathHistory[haulerId][pathHistory[haulerId].length - 1].pos;
           return null;
         }
-        
+
         function drawPathHistory(selectedHauler = 'D3') {
+          // Clear existing layers
           for (const haulerId in pathPolylines) {
             if (pathPolylines[haulerId]) map.removeLayer(pathPolylines[haulerId]);
           }
@@ -3516,41 +3896,79 @@
             if (vehicleMarkers[haulerId]) vehicleMarkers[haulerId].forEach(marker => map.removeLayer(marker));
             vehicleMarkers[haulerId] = [];
           }
-          
+
           let centerPosition = null;
-          if (selectedHauler !== 'all') {
-            centerPosition = getHaulerCurrentPosition(selectedHauler);
-            if (centerPosition) map.setView(centerPosition, 15);
+          // Center map based on selection
+          if (selectedHauler === 'all') {
+            // Try to center on first available vehicle
+            let centered = false;
+            for (const haulerId in sites) {
+              if (sites[haulerId] && sites[haulerId].pos) {
+                map.setView(sites[haulerId].pos, 15);
+                console.log(`🎯 Centering map on ${haulerId} for All Vehicles view`);
+                centered = true;
+                break;
+              }
+            }
+            if (!centered) {
+              console.log('⚠️ No positions available yet for All Vehicles view, will retry');
+              setTimeout(() => {
+                for (const haulerId in sites) {
+                  if (sites[haulerId] && sites[haulerId].pos) {
+                    map.setView(sites[haulerId].pos, 15);
+                    break;
+                  }
+                }
+              }, 500);
+            }
+          } else {
+            // Center on selected hauler
+            const centerPosition = getHaulerCurrentPosition(selectedHauler);
+            if (centerPosition) {
+              map.setView(centerPosition, 15);
+              console.log(`🎯 Centering map on ${selectedHauler} at:`, centerPosition);
+            } else {
+              console.log(`⚠️ No position for ${selectedHauler} yet, will retry`);
+              // Retry after a short delay
+              setTimeout(() => {
+                const retryPos = getHaulerCurrentPosition(selectedHauler);
+                if (retryPos) {
+                  map.setView(retryPos, 15);
+                  console.log(`✅ Retry successful for ${selectedHauler}`);
+                }
+              }, 500);
+            }
           }
-          
+          // Draw path for all haulers
           for (const haulerId in pathHistory) {
             if (selectedHauler !== 'all' && haulerId !== selectedHauler) continue;
-            
+
             if (pathHistory[haulerId].length > 1) {
               const positions = pathHistory[haulerId].map(p => p.pos);
               const baseColor = getHaulerBaseColor(haulerId);
-              
+
               pathSegments[haulerId] = [];
               vehicleMarkers[haulerId] = [];
-              
+
+              // Draw segments between consecutive points
               for (let i = 1; i < pathHistory[haulerId].length; i++) {
-                const prevPoint = pathHistory[haulerId][i-1];
+                const prevPoint = pathHistory[haulerId][i - 1];
                 const currentPoint = pathHistory[haulerId][i];
                 const calc = calculateSegmentDistance(prevPoint, currentPoint);
-                
+
                 const pitch = Math.abs(currentPoint.pitch || 0);
                 const segmentType = pitch <= 5 ? 'flat' : 'gradient';
                 const segmentColor = getSegmentColor(segmentType);
-                
+
                 const segment = L.polyline([prevPoint.pos, currentPoint.pos], {
                   color: segmentColor, weight: 4, opacity: 0.8, lineCap: 'round', interactive: false
                 }).addTo(map);
-                
+
                 pathSegments[haulerId].push(segment);
-                
+
                 const segmentTypeLabel = segmentType === 'flat' ? 'Flat (≤5°)' : 'Gradient (>5°)';
                 const segmentTypeColor = segmentType === 'flat' ? '#4CAF50' : '#FF9800';
-                
+
                 segment.bindPopup(`
                   <div style="min-width: 200px;">
                     <b>${getDisplayName(haulerId)} - Segment ${i}</b><br>
@@ -3558,26 +3976,27 @@
                     <b>Segment Info:</b><br>
                     • Type: <b style="color:${segmentTypeColor}">${segmentTypeLabel}</b><br>
                     • Gradient Angle: ${getPitchDisplay(currentPoint.pitch)}<br>
-                    • Elevation: ${getMovementLabel(currentPoint.movement)}<br>
+                    • Elevation: ${getMovementLabel(currentPoint.pitch)}<br>
                     • Distance: ${(calc.distance * 1000).toFixed(1)} m<br>
                     • From: ${prevPoint.pos[0].toFixed(6)}, ${prevPoint.pos[1].toFixed(6)}<br>
                     • To: ${currentPoint.pos[0].toFixed(6)}, ${currentPoint.pos[1].toFixed(6)}
                   </div>
                 `);
-                
+
                 currentPoint.distance = calc.distance;
                 currentPoint.pitchDisplay = calc.pitchDisplay;
                 currentPoint.movementLabel = calc.movementLabel;
                 currentPoint.segmentType = segmentType;
               }
-              
+
+              // Add markers for each point
               for (let i = 0; i < pathHistory[haulerId].length; i++) {
                 const point = pathHistory[haulerId][i];
-                
+
                 const marker = L.circleMarker(point.pos, {
                   radius: 3, color: baseColor, fillColor: baseColor, fillOpacity: 0.7, weight: 1, interactive: true
                 }).addTo(map);
-                
+
                 let vibrationInfo = '';
                 if (haulerId === 'D7' && point.vibration) {
                   const vibrationLabel = getVibrationLabel(point.vibration);
@@ -3585,22 +4004,20 @@
                   vibrationInfo = `
                     <hr style="margin: 5px 0;">
                     <b>Vibration Analysis:</b><br>
-                    • Vibration Level: <b style="color:${
-                      point.vibration === 1 || point.vibration === 2 ? '#4CAF50' : 
-                      point.vibration === 3 ? '#FF9800' : 
-                      point.vibration === 4 || point.vibration === 5 ? '#F44336' : '#9E9E9E'
+                    • Vibration Level: <b style="color:${point.vibration <= 2 ? '#4CAF50' :
+                      point.vibration <= 4 ? '#FF9800' :
+                        '#F44336'
                     }">${vibrationLabel}</b><br>
-                    • Detected State: <b style="color:${
-                      excavatorState === 'IDLE' ? '#4CAF50' : 
-                      excavatorState === 'OPERATING' ? '#FF9800' : 
-                      excavatorState === 'LOADING' ? '#F44336' : '#9E9E9E'
+                    • Detected State: <b style="color:${excavatorState === 'IDLE' ? '#4CAF50' :
+                      excavatorState === 'OPERATING' ? '#FF9800' :
+                        excavatorState === 'LOADING' ? '#F44336' : '#9E9E9E'
                     }">${excavatorState}</b><br>
                   `;
                 }
-                
+
                 marker.bindPopup(`
                   <div style="min-width: 200px;">
-                    <b>${getDisplayName(haulerId)} - Point ${i+1}</b><br>
+                    <b>${getDisplayName(haulerId)} - Point ${i + 1}</b><br>
                     <hr style="margin: 5px 0;">
                     <b>Position Info:</b><br>
                     • Lat: ${point.pos[0].toFixed(6)}<br>
@@ -3609,16 +4026,17 @@
                     ${vibrationInfo}
                   </div>
                 `);
-                
+
                 if (!pathMarkers[haulerId]) pathMarkers[haulerId] = [];
                 pathMarkers[haulerId].push(marker);
               }
-              
+
+              // Add background path polyline
               pathPolylines[haulerId] = L.polyline(positions, {
                 color: baseColor, weight: 2, opacity: 0.3, lineCap: 'round',
                 dashArray: haulerId === 'D7' ? '10, 10' : null, interactive: false
               }).addTo(map);
-              
+
               const lastPoint = pathHistory[haulerId][pathHistory[haulerId].length - 1];
               const segmentAnalysis = analyzePathSegments24Hour(haulerId);
               const segmentInfo = `
@@ -3630,7 +4048,7 @@
                 • Gradient Distance: <b style="color:#FF9800">${segmentAnalysis.gradientDistance.toFixed(3)} km</b><br>
                 <small>Flat: ≤5° | Gradient: >5°</small>
               `;
-              
+
               pathPolylines[haulerId].bindPopup(`
                 <div style="min-width: 250px;">
                   <b>${getDisplayName(haulerId)} - 24 Hour Travel Path</b><br>
@@ -3643,15 +4061,20 @@
                 </div>
               `);
             }
-            
+          }
+
+          // Add current position markers for all vehicles
+          for (const haulerId in sites) {
+            if (selectedHauler !== 'all' && haulerId !== selectedHauler) continue;
+
             if (sites[haulerId] && sites[haulerId].pos) {
               const s = sites[haulerId];
-              
+
               if (haulerId === 'D7') {
                 const vibration = s.vibration || 0;
                 const vibrationLabel = getVibrationLabel(vibration);
                 const excavatorState = detectExcavatorState(vibration, s.movement);
-                
+
                 const excavatorMarker = L.marker(s.pos, {
                   icon: L.divIcon({
                     html: `<div style="background:#FF5722;padding:4px;border-radius:50%;font-weight:700;color:#000;font-size:10px;border:3px solid #fff;box-shadow: 0 0 10px rgba(0,0,0,0.5);">EXCAVATOR</div>`,
@@ -3668,22 +4091,20 @@
                     • RL: ${s.rl} m (Z:${s.altitude?.toFixed(1)} + C:${FIXED_SEA_LEVEL_HEIGHT})<br>
                     <hr style="margin: 5px 0;">
                     <b>Vibration Analysis:</b><br>
-                    • Vibration Level: <b style="color:${
-                      vibration === 1 || vibration === 2 ? '#4CAF50' : 
-                      vibration === 3 ? '#FF9800' : 
-                      vibration === 4 || vibration === 5 ? '#F44336' : '#9E9E9E'
-                    }">${vibrationLabel} (${vibration})</b><br>
-                    • Detected State: <b style="color:${
-                      excavatorState === 'IDLE' ? '#4CAF50' : 
-                      excavatorState === 'OPERATING' ? '#FF9800' : 
+                    • Vibration Level: <b style="color:${vibration <= 2 ? '#4CAF50' :
+                    vibration <= 4 ? '#FF9800' :
+                      '#F44336'
+                  }">${vibrationLabel} (${vibration})</b><br>
+                    • Detected State: <b style="color:${excavatorState === 'IDLE' ? '#4CAF50' :
+                    excavatorState === 'OPERATING' ? '#FF9800' :
                       excavatorState === 'LOADING' ? '#F44336' : '#9E9E9E'
-                    }">${excavatorState}</b><br>
+                  }">${excavatorState}</b><br>
                   </div>
                 `);
-                
+
                 if (!vehicleMarkers[haulerId]) vehicleMarkers[haulerId] = [];
                 vehicleMarkers[haulerId].push(excavatorMarker);
-                
+
                 const rlVal = s.rl;
                 if (rlVal !== null) {
                   const rlMarker = L.marker([s.pos[0] - 0.0001, s.pos[1]], {
@@ -3705,12 +4126,12 @@
                     }),
                     interactive: true
                   }).addTo(map).bindPopup(`<b>${getDisplayName(s.id)} - RL: ${rlVal} m (Z:${s.altitude?.toFixed(1)} + C:${FIXED_SEA_LEVEL_HEIGHT})</b>`);
-                  
+
                   if (!vehicleMarkers[haulerId]) vehicleMarkers[haulerId] = [];
                   vehicleMarkers[haulerId].push(rlMarker);
                 }
 
-                const haulerColor = s.id === 'D3' ? '#2196F3' : s.id === 'D8' ? '#4CAF50' : s.id === 'D9' ? '#9C27B0' : '#2196F3';
+                const haulerColor = s.id === 'D3' ? '#2196F3' : s.id === 'D8' ? '#4CAF50' : s.id === 'D9' ? '#9C27B0' : s.id === 'D14' ? '#9C27B0' : '#2196F3';
                 const haulerMarker = L.marker(s.pos, {
                   icon: L.divIcon({
                     html: `<div style="background:${haulerColor};padding:4px;border-radius:4px;font-weight:700;color:#000;font-size:10px;border:2px solid #fff;">${getDisplayName(s.id)}</div>`,
@@ -3727,14 +4148,14 @@
                     • RL: ${s.rl} m (Z:${s.altitude?.toFixed(1)} + C:${FIXED_SEA_LEVEL_HEIGHT})<br>
                   </div>
                 `);
-                
+
                 if (!vehicleMarkers[haulerId]) vehicleMarkers[haulerId] = [];
                 vehicleMarkers[haulerId].push(haulerMarker);
               }
             }
           }
         }
-        
+
         drawPathHistory('D3');
 
         const haulers = {};
@@ -3742,7 +4163,7 @@
           for (const key in backend.sites) {
             const site = backend.sites[key];
             const segments = analyzePathSegments24Hour(key);
-            
+
             haulers[key] = {
               id: key, load: site.load || 0, pitch: site.pitch || 0, roll: site.roll || 0,
               vibration: site.vibration || 0, movement: site.movement || 0,
@@ -3768,53 +4189,11 @@
           }
         }
 
-        function updateHaulerDropdown() {
-          const selector = document.getElementById('haulerSelector');
-          if (!selector) return;
-          
-          // Save current selection
-          const currentValue = selector.value;
-          
-          // Clear existing options
-          selector.innerHTML = '';
-          
-          // Get all unique device IDs from haulers object
-          const deviceIds = Object.keys(haulers).sort();
-          
-          console.log('📱 Devices found for dropdown:', deviceIds);
-          
-          // Add options for each device
-          deviceIds.forEach(id => {
-            const option = document.createElement('option');
-            option.value = id;
-            const type = id === 'D7' ? 'Excavator' : 'Hauler';
-            const displayName = getDisplayName(id);
-            option.text = `${displayName} (${type})`;
-            selector.appendChild(option);
-          });
-          
-          // Add "All Vehicles" option
-          const allOption = document.createElement('option');
-          allOption.value = 'all';
-          allOption.text = 'All Vehicles';
-          selector.appendChild(allOption);
-          
-          // Restore previous selection if it exists
-          if (currentValue && (deviceIds.includes(currentValue) || currentValue === 'all')) {
-            selector.value = currentValue;
-          } else if (deviceIds.includes('D3')) {
-            selector.value = 'D3';
-          } else if (deviceIds.length > 0) {
-            selector.value = deviceIds[0];
-          }
-        }
-        updateHaulerDropdown();
-
         // ==================== SMART POLLING ====================
         let lastDataHash = '', isPolling = false, isUpdatingUI = false;
-        const POLL_INTERVAL = 10000;
+        const POLL_INTERVAL = 5000; // Reduced to 5 seconds for more frequent updates
         let updateTimeout = null, currentSelectedHauler = 'D3', currentChartHauler = 'D3';
-        
+
         function debouncedUpdateUI() {
           if (isUpdatingUI) return;
           if (updateTimeout) clearTimeout(updateTimeout);
@@ -3829,7 +4208,7 @@
             isUpdatingUI = false;
           }, 50);
         }
-        
+
         function generateDataHash(data) {
           if (!data || !data.sites) return '';
           return Object.keys(data.sites).sort().map(key => {
@@ -3837,57 +4216,57 @@
             return `${key}:${site.pos?.[0]?.toFixed(6)}:${site.pos?.[1]?.toFixed(6)}:${site.load}:${site.speed}:${site.vibration}:${site.pitch}:${site.roll}:${site.movement}:${site.altitude}`;
           }).join('|');
         }
-        
+
         function renderSegmentChart(deviceId) {
           const canvas = document.getElementById('segmentChart');
           const segmentHaulerName = document.getElementById('segmentHaulerName');
           const segmentAnalysisChart = document.getElementById('segmentAnalysisChart');
-          
+
           if (!canvas) return;
-          
+
           if (segmentHaulerName) segmentHaulerName.textContent = getDisplayName(deviceId);
-          
+
           const ctx = canvas.getContext('2d');
           if (window.segmentChartInstance) window.segmentChartInstance.destroy();
-          
+
           const device = haulers[deviceId];
           if (!device) {
             if (segmentAnalysisChart) segmentAnalysisChart.style.display = 'none';
             return;
           }
-          
+
           const flatSegments = device.flatSegments24Hour || 0;
-          
+
           let gradient5to30 = device.gradient5to30 || 0;
           let gradient30to50 = device.gradient30to50 || 0;
           let gradientAbove50 = device.gradientAbove50 || 0;
           let gradient5to30Distance = device.gradient5to30Distance || 0;
           let gradient30to50Distance = device.gradient30to50Distance || 0;
           let gradientAbove50Distance = device.gradientAbove50Distance || 0;
-          
+
           const flatDistance = device.flatDistance24Hour || 0;
           const totalSegments = flatSegments + gradient5to30 + gradient30to50 + gradientAbove50;
           const totalDistance = flatDistance + gradient5to30Distance + gradient30to50Distance + gradientAbove50Distance;
-          
+
           if (totalSegments === 0 && totalDistance === 0) {
             if (segmentAnalysisChart) segmentAnalysisChart.style.display = 'none';
             return;
           }
-          
+
           if (segmentAnalysisChart) segmentAnalysisChart.style.display = 'block';
           canvas.style.display = 'block';
-          
+
           const flatCountEl = document.getElementById('flatSegmentsCount');
           const gradientCountEl = document.getElementById('gradientSegmentsCount');
           const totalCountEl = document.getElementById('totalSegmentsCount');
-          
+
           if (flatCountEl && gradientCountEl && totalCountEl) {
             const totalGradient = gradient5to30 + gradient30to50 + gradientAbove50;
             flatCountEl.textContent = flatSegments;
             gradientCountEl.textContent = totalGradient;
             totalCountEl.textContent = totalSegments;
           }
-          
+
           const data = {
             labels: ['Flat (0-5°)', 'Gradient 5-30°', 'Gradient 30-50°', 'Gradient >50°'],
             datasets: [{
@@ -3897,7 +4276,7 @@
               borderWidth: 2, borderRadius: 6, barPercentage: 0.6, categoryPercentage: 0.7
             }]
           };
-          
+
           window.segmentChartInstance = new Chart(ctx, {
             type: 'bar',
             data: data,
@@ -3928,7 +4307,7 @@
               animation: { duration: 500, easing: 'easeOutQuart' }
             }
           });
-          
+
           canvas.style.background = '#000';
           canvas.style.borderRadius = '4px';
         }
@@ -3936,41 +4315,88 @@
         async function smartPoll() {
           if (isPolling) return;
           isPolling = true;
-          
+
           try {
-            console.log('🔍 Checking for backend updates...');
-            const response = await fetch(`${BASE_URL}/fetchDashboardDataby?company=TMC&sector=Mining&region=Kache`);
+            console.log('🔍 Checking for backend updates in', region, '...');
+            const response = await fetch(`${BASE_URL}/fetchDashboardDataby?company=${encodeURIComponent(company)}&sector=${encodeURIComponent(sector)}&region=${encodeURIComponent(region)}`);
             if (!response.ok) {
-              console.warn('Backend not responding');
+              console.warn('Backend not responding for', region);
               return;
             }
-            
+
             const json = await response.json();
-            if (json.status === 'success' && json.devices) {
+            if (json.status === 'success') {
               const newData = { sites: {} };
-              json.devices.forEach(device => {
-                if (device.device_id) {
-                  newData.sites[device.device_id] = {
-                    id: device.device_id, pos: [device.latitude, device.longitude],
-                    timestamp: device.timestamp, altitude: device.altitude,
-                    pitch: device.pitch, roll: device.roll,
-                    vibration: device.vibration, movement: device.movement,
-                    load: device.load || 0, speed: device.speed || 0
-                  };
+
+              // Handle different data structures
+              if (json.devices && Array.isArray(json.devices)) {
+                if (json.devices.length > 0 && typeof json.devices[0] === 'object') {
+                  json.devices.forEach(device => {
+                    if (device.device_id) {
+                      newData.sites[device.device_id] = {
+                        id: device.device_id,
+                        pos: [device.latitude || (region === 'Velastra' ? 23.5 : 12.9567),
+                        device.longitude || (region === 'Velastra' ? 87.3 : 77.73086)],
+                        timestamp: device.timestamp || new Date().toISOString(),
+                        altitude: device.altitude || 0,
+                        pitch: device.pitch || 0,
+                        roll: device.roll || 0,
+                        vibration: device.vibration || 0,
+                        movement: device.movement || 'STABLE',
+                        load: device.load || 0,
+                        speed: device.speed || 0
+                      };
+                    }
+                  });
+                } else {
+                  // Devices array contains strings
+                  json.devices.forEach(deviceId => {
+                    newData.sites[deviceId] = {
+                      id: deviceId,
+                      pos: [region === 'Velastra' ? 23.5 : 12.9567,
+                      region === 'Velastra' ? 87.3 : 77.73086],
+                      timestamp: new Date().toISOString(),
+                      altitude: 0,
+                      pitch: 0,
+                      roll: 0,
+                      vibration: 0,
+                      movement: 'STABLE',
+                      load: 0,
+                      speed: 0
+                    };
+                  });
                 }
-              });
-              
+              } else if (json.data && Array.isArray(json.data)) {
+                json.data.forEach(item => {
+                  if (item.device_id) {
+                    newData.sites[item.device_id] = {
+                      id: item.device_id,
+                      pos: [item.latitude || (region === 'Velastra' ? 23.5 : 12.9567),
+                      item.longitude || (region === 'Velastra' ? 87.3 : 77.73086)],
+                      timestamp: item.timestamp || new Date().toISOString(),
+                      altitude: item.altitude || 0,
+                      pitch: item.pitch || 0,
+                      roll: item.roll || 0,
+                      vibration: item.vibration || 0,
+                      movement: item.movement || 'STABLE',
+                      load: item.load || 0,
+                      speed: item.speed || 0
+                    };
+                  }
+                });
+              }
+
               const newHash = generateDataHash(newData);
               if (newHash !== lastDataHash) {
-                console.log('✅ New data detected! Updating UI...');
+                console.log('✅ New data detected for', region, '! Updating UI...');
                 lastDataHash = newHash;
                 await processNewData(newData);
               } else {
-                console.log('⏭️ No changes in backend data');
+                console.log('⏭️ No changes in backend data for', region);
               }
             }
           } catch (error) {
-            console.error('Polling error:', error);
+            console.error('Polling error for', region, ':', error);
           } finally {
             isPolling = false;
           }
@@ -3978,34 +4404,41 @@
 
         async function processNewData(newData) {
           if (!newData || !newData.sites) return;
-          
+
           const now = Date.now();
           let dataChanged = false;
           let haulersWithNewData = new Set();
-          
+
           for (const haulerId in newData.sites) {
             const site = newData.sites[haulerId];
+            console.log(`Processing ${haulerId} in ${region}:`, site);
+
             if (site.pos && Array.isArray(site.pos)) {
               if (!pathHistory[haulerId]) pathHistory[haulerId] = [];
-              
+
               const lastPoint = pathHistory[haulerId][pathHistory[haulerId].length - 1];
-              const shouldAddPoint = !lastPoint || haversineKm(lastPoint.pos, site.pos) > 0.0005;
-              
+              const shouldAddPoint = !lastPoint || haversineKm(lastPoint.pos, site.pos) > 0.0001; // Reduced threshold to 0.1m
+
               if (shouldAddPoint) {
                 dataChanged = true;
                 haulersWithNewData.add(haulerId);
                 const C = 525.5;
                 const altitude = site.altitude || 0;
                 const rl = altitude + C;
-                
+
                 pathHistory[haulerId].push({
                   pos: site.pos, timestamp: now, rl: Number(rl.toFixed(2)),
                   altitude: altitude, pitch: site.pitch || 0, roll: site.roll || 0,
                   vibration: site.vibration || 0, movement: Number(site.movement ?? 0),
                   payload: site.load || 0, speed: site.speed || 0
                 });
+
+                // Limit history to 1000 points max
+                if (pathHistory[haulerId].length > 1000) {
+                  pathHistory[haulerId] = pathHistory[haulerId].slice(-500);
+                }
               }
-              
+
               if (sites[haulerId]) {
                 sites[haulerId].pos = site.pos;
                 sites[haulerId].rl = getRL(site.altitude);
@@ -4025,7 +4458,7 @@
                   load: site.load || 0, speed: site.speed || 0
                 };
               }
-              
+
               const segments = analyzePathSegments24Hour(haulerId);
               if (haulers[haulerId]) {
                 haulers[haulerId].currentPos = site.pos;
@@ -4071,24 +4504,22 @@
               }
             }
           }
-          
+
           if (dataChanged) {
             pathHistory = cleanOldPathHistory(pathHistory);
             savePathHistory(pathHistory);
             debouncedUpdateUI();
 
-            updateHaulerDropdown();
-            
             const haulerSelector = document.getElementById('haulerSelector');
             const selectedHauler = haulerSelector ? haulerSelector.value : 'D3';
-            
+
             if (haulersWithNewData.has(selectedHauler)) {
-              console.log(`📈 New data for currently selected hauler ${getDisplayName(selectedHauler)}, updating chart...`);
+              console.log(`📈 New data for currently selected hauler ${getDisplayName(selectedHauler)} in ${region}, updating chart...`);
               updateChartForHauler(selectedHauler);
             }
-            
+
             if (selectedHauler === 'all') {
-              console.log('📈 New data in all view, updating all haulers chart...');
+              console.log('📈 New data in all view for', region, ', updating all haulers chart...');
               updateChartForHauler('all');
             }
           }
@@ -4096,7 +4527,7 @@
 
         function updateChartForHauler(haulerId) {
           if (haulerId === currentChartHauler || (haulerId === 'all' && currentChartHauler === 'all')) {
-            console.log(`🔄 Updating chart for ${getDisplayName(haulerId)}`);
+            console.log(`🔄 Updating chart for ${getDisplayName(haulerId)} in ${region}`);
             if (haulerId === 'all') {
               if (typeof renderAllHaulersFuelChart === 'function') renderAllHaulersFuelChart(true);
             } else {
@@ -4128,8 +4559,8 @@
               totalPathDistance24Hour += H.pathDistance24Hour;
               visibleHaulers++;
             }
-            
-            const excavatorPos = sites['D7'] ? sites['D7'].pos : [12.9567, 77.73086];
+
+            const excavatorPos = sites['D7'] ? sites['D7'].pos : (region === 'Velastra' ? [23.5, 87.3] : [12.9567, 77.73086]);
             const d7Vibration = haulers['D7']?.vibration || 0;
             const d7VibrationLabel = getVibrationLabel(d7Vibration);
             const d7State = detectExcavatorState(d7Vibration, haulers['D7']?.movement || 'STABLE');
@@ -4138,7 +4569,7 @@
 
             let totalFlatSegments24Hour = 0, totalGradientSegments24Hour = 0;
             let totalFlatDistance24Hour = 0, totalGradientDistance24Hour = 0;
-            
+
             for (const key in haulers) {
               if (key !== 'D7') {
                 totalFlatSegments24Hour += haulers[key].flatSegments24Hour || 0;
@@ -4153,15 +4584,15 @@
             summaryHtml.innerHTML = `
               <div style="background: rgba(0,0,0,0.1); padding: 10px; border-radius: 5px; margin-bottom: 10px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <strong style="color: #fff;">Fleet Overview (24-hour)</strong>
+                  <strong style="color: #fff;">Fleet Overview (24-hour) - ${region}</strong>
                   <span style="color: #8fe; font-size: 12px;">${visibleHaulers} vehicles</span>
                 </div>
               </div>
               <table style="width:100%;border-collapse:collapse;font-size:13px;color:#dff;margin-top:8px">
                 <tr><td style="color:#8fe;font-weight:700;width=42%">Excavator Position</td><td>${excavatorPos[0].toFixed(6)}, ${excavatorPos[1].toFixed(6)}</td></tr>
-                <tr><td style="color:#8fe;font-weight:700;width=42%">Excavator RL</td><td><b>${d7RL} m</b> (Z:${d7Altitude?.toFixed(1)} + C:${FIXED_SEA_LEVEL_HEIGHT})</td></tr>
+                <tr><td style="color:#8fe;font-weight:700;width=42%">Excavator RL</td><td><b>${d7RL || 525.5} m</b> (Z:${d7Altitude?.toFixed(1)} + C:${FIXED_SEA_LEVEL_HEIGHT})</td></tr>
                 <tr><td style="color:#8fe;font-weight:700;width=42%">Excavator Pitch</td><td>${haulers['D7']?.pitchDisplay || '0°'}</td></tr>
-                <tr><td style="color:#8fe;font-weight:700;width=42%">Excavator Vibration</td><td style="color:${d7Vibration === 1 || d7Vibration === 2 ? '#4CAF50' : d7Vibration === 3 ? '#FF9800' : d7Vibration === 4 || d7Vibration === 5 ? '#F44336' : '#9E9E9E'}">${d7VibrationLabel}</td></tr>
+                <tr><td style="color:#8fe;font-weight:700;width=42%">Excavator Vibration</td><td style="color:${d7Vibration <= 2 ? '#4CAF50' : d7Vibration <= 4 ? '#FF9800' : '#F44336'}">${d7VibrationLabel}</td></tr>
                 <tr><td style="color:#8fe;font-weight:700;width=42%">Excavator State</td><td style="color:${d7State === 'IDLE' ? '#4CAF50' : d7State === 'OPERATING' ? '#FF9800' : d7State === 'LOADING' ? '#F44336' : '#9E9E9E'}">${d7State}</td></tr>
                 <tr><td style="color:#8fe;font-weight:700;width=42%">Total Path Points</td><td><b>${totalPathPoints24Hour}</b></td></tr>
                 <tr><td style="color:#8fe;font-weight:700;width=42%">Total Distance</td><td><b>${totalPathDistance24Hour.toFixed(3)} km</b></td></tr>
@@ -4186,7 +4617,7 @@
             }
 
             container.innerHTML = '';
-            
+
             if (selectedHaulerData) {
               const H = selectedHaulerData;
 
@@ -4194,11 +4625,11 @@
                 const vibration = H.vibration || 0;
                 const vibrationLabel = getVibrationLabel(vibration);
                 const excavatorState = detectExcavatorState(vibration, H.movement);
-                
+
                 summaryHtml.innerHTML = `
                   <div style="background: rgba(0,0,0,0.1); padding: 10px; border-radius: 5px; margin-bottom: 10px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                      <strong style="color: #fff;">${getDisplayName('D7')} Detailed Info (24-hour)</strong>
+                      <strong style="color: #fff;">${getDisplayName('D7')} Detailed Info (24-hour) - ${region}</strong>
                       <span style="color:#FF5722; font-size:12px; font-weight:bold;">EXCAVATOR</span>
                     </div>
                   </div>
@@ -4210,7 +4641,7 @@
                     <tr><td style="color:#8fe;font-weight:700;width=42%">RL</td><td><b>${H.rl || 'N/A'} m</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Gradient Angle</td><td><b>${H.pitchDisplay}</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Elevation</td><td style="color:${H.movementLabel === 'UPHILL' ? '#FF9800' : H.movementLabel === 'DOWNHILL' ? '#2196F3' : '#4CAF50'}"><b>${H.movementLabel}</b></td></tr>
-                    <tr><td style="color:#8fe;font-weight:700;width=42%">Vibration Level</td><td style="color:${vibration === 1 || vibration === 2 ? '#4CAF50' : vibration === 3 ? '#FF9800' : vibration === 4 || vibration === 5 ? '#F44336' : '#9E9E9E'}"><b>${vibrationLabel} (${vibration})</b></td></tr>
+                    <tr><td style="color:#8fe;font-weight:700;width=42%">Vibration Level</td><td style="color:${vibration <= 2 ? '#4CAF50' : vibration <= 4 ? '#FF9800' : '#F44336'}"><b>${vibrationLabel} (${vibration})</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Detected State</td><td style="color:${excavatorState === 'IDLE' ? '#4CAF50' : excavatorState === 'OPERATING' ? '#FF9800' : excavatorState === 'LOADING' ? '#F44336' : '#9E9E9E'}"><b>${excavatorState}</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Roll</td><td><b>${H.roll ?? 'N/A'}°</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Path Points</td><td><b>${H.pathPoints24Hour}</b></td></tr>
@@ -4225,7 +4656,7 @@
                 summaryHtml.innerHTML = `
                   <div style="background: rgba(0,0,0,0.1); padding: 10px; border-radius: 5px; margin-bottom: 10px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                      <strong style="color: #fff;">${getDisplayName(H.id)} Detailed Info (24-hour)</strong>
+                      <strong style="color: #fff;">${getDisplayName(H.id)} Detailed Info (24-hour) - ${region}</strong>
                       <span style="color:#2196F3; font-size:12px; font-weight:bold;">HAULER</span>
                     </div>
                   </div>
@@ -4254,7 +4685,7 @@
               currentChartHauler = selectedHauler;
               if (typeof renderFuelGradientForHauler === 'function') renderFuelGradientForHauler(selectedHauler);
             } else {
-              summaryHtml.innerHTML = `No 24-hour data available for ${getDisplayName(selectedHauler)}`;
+              summaryHtml.innerHTML = `No 24-hour data available for ${getDisplayName(selectedHauler)} in ${region}`;
               const selectedHaulerFuelChart = document.getElementById('selectedHaulerFuelChart');
               if (selectedHaulerFuelChart) selectedHaulerFuelChart.style.display = 'none';
             }
@@ -4265,19 +4696,36 @@
           const haulerSelector = document.getElementById('haulerSelector');
           if (!haulerSelector) return;
 
-          // Just add the event listener, the options will be populated by updateHaulerDropdown
-          haulerSelector.addEventListener('change', function() {
+          haulerSelector.innerHTML = '';
+
+          // Get all unique hauler IDs from sites
+          const haulerIds = Object.keys(sites).sort();
+
+          haulerIds.forEach(id => {
+            const opt = document.createElement('option');
+            opt.value = id;
+            const type = (id === 'D7') ? 'Excavator' : 'Hauler';
+            opt.text = `${getDisplayName(id)} (${type})`;
+            haulerSelector.appendChild(opt);
+          });
+
+          const allOption = document.createElement('option');
+          allOption.value = 'all';
+          allOption.text = 'All Vehicles';
+          haulerSelector.appendChild(allOption);
+
+          haulerSelector.addEventListener('change', function () {
             console.log('Dropdown changed to:', getDisplayName(this.value));
             currentSelectedHauler = this.value;
-            
+
             if (this.value !== 'all') {
               const centerPos = getHaulerCurrentPosition(this.value);
               if (centerPos) setTimeout(() => map.setView(centerPos, 15), 10);
             }
-            
+
             drawPathHistory(this.value);
             renderUI();
-            
+
             if (this.value === 'all') {
               currentChartHauler = 'all';
               const segmentAnalysisChart = document.getElementById('segmentAnalysisChart');
@@ -4298,22 +4746,24 @@
             }
           });
         }
+
         initializeDropdown();
 
         setTimeout(() => {
           setInterval(smartPoll, POLL_INTERVAL);
           smartPoll();
-          console.log(`🔍 Started smart polling (checks every ${POLL_INTERVAL/1000} seconds)`);
+          console.log(`🔍 Started smart polling for ${region} (checks every ${POLL_INTERVAL / 1000} seconds)`);
         }, 2000);
 
         renderUI();
 
         setTimeout(() => {
-          currentChartHauler = 'D3';
+          const firstHauler = Object.keys(sites)[0] || 'D3';
+          currentChartHauler = firstHauler;
           const segmentAnalysisChart = document.getElementById('segmentAnalysisChart');
           if (segmentAnalysisChart) segmentAnalysisChart.style.display = 'block';
-          if (typeof renderSegmentChart === 'function') renderSegmentChart('D3');
-          if (typeof renderFuelGradientForHauler === 'function') renderFuelGradientForHauler('D3');
+          if (typeof renderSegmentChart === 'function') renderSegmentChart(firstHauler);
+          if (typeof renderFuelGradientForHauler === 'function') renderFuelGradientForHauler(firstHauler);
         }, 500);
 
         map.on('click', (e) => console.log('Map clicked at:', e.latlng));
@@ -4324,7 +4774,7 @@
           if (map.tap) map.tap.enable();
           if (map.touchZoom) map.touchZoom.enable();
           if (map.dragging) map.dragging.enable();
-          console.log('✅ Map gestures fully enabled');
+          console.log('✅ Map gestures fully enabled for', region);
         }, 1000);
 
         document.getElementById('Fuel').style.visibility = 'visible';
@@ -4333,4 +4783,5 @@
     }
   </script>
 </body>
+
 </html>
