@@ -656,9 +656,8 @@ const insertRealtimeData = (req, res) => {
     count1,
     timestamp,
     gps_status,
-    z_axis,
-    temperature,
-    // Add any other fields that might come
+    z_axis
+    // REMOVED temperature - not needed
   } = req.body;
 
   // ONLY device_id is required - nothing else!
@@ -711,8 +710,8 @@ const insertRealtimeData = (req, res) => {
   console.log(`📡 Received data from device ${device_id}:`, req.body);
 
   // Check what data we received
-  const hasGPS = latitude !== undefined && latitude !== null && 
-                 longitude !== undefined && longitude !== null;
+  const hasGPS = latitude !== undefined && latitude !== null && latitude !== 0 && 
+                 longitude !== undefined && longitude !== null && longitude !== 0;
   const hasCount = count1 !== undefined && count1 !== null;
 
   if (hasGPS) console.log(`📍 Device ${device_id} sent GPS data`);
@@ -734,11 +733,11 @@ const insertRealtimeData = (req, res) => {
 
     const region_id = regionResults[0].region_id;
 
-    // Get previous data point (for calculations)
+    // Get previous data point (for calculations) - only needed if we have GPS
     const getPreviousPointQuery = `
       SELECT latitude, longitude, timestamp
       FROM realtime_sensor_data
-      WHERE device_id = ?
+      WHERE device_id = ? AND latitude IS NOT NULL AND longitude IS NOT NULL
       ORDER BY id DESC
       LIMIT 1
     `;
@@ -775,38 +774,38 @@ const insertRealtimeData = (req, res) => {
         else movementNumeric = parseFloat(movement) || 0;
       }
 
-      // ========== FUEL CALCULATION ==========
-      if (fuel !== undefined && fuel !== null) {
-        // Case 1: Direct fuel sensor value
-        fuelUsed = parseFloat(fuel);
-        console.log("⛽ Using direct fuel sensor value");
-      } 
-      else if (hasGPS && prevResults && prevResults.length > 0 && prevResults[0].latitude) {
-        // Case 2: Calculate distance and fuel from GPS
-        try {
-          const prevLat = parseFloat(prevResults[0].latitude);
-          const prevLon = parseFloat(prevResults[0].longitude);
-          const currLat = parseFloat(latitude);
-          const currLon = parseFloat(longitude);
+      // ========== FUEL CALCULATION - ONLY IF GPS DATA EXISTS ==========
+      if (hasGPS) {
+        if (fuel !== undefined && fuel !== null) {
+          // Case 1: Direct fuel sensor value provided
+          fuelUsed = parseFloat(fuel);
+          console.log("⛽ Using direct fuel sensor value");
+        } 
+        else if (prevResults && prevResults.length > 0 && prevResults[0].latitude) {
+          // Case 2: Calculate distance and fuel from GPS
+          try {
+            const prevLat = parseFloat(prevResults[0].latitude);
+            const prevLon = parseFloat(prevResults[0].longitude);
+            const currLat = parseFloat(latitude);
+            const currLon = parseFloat(longitude);
 
-          distance = haversineKm([prevLat, prevLon], [currLat, currLon]);
-          fuelUsed = calculateFuel(distance, parseFloat(pitch) || 0, movementNumeric, timeDiffHours);
-          console.log("⚙️ Calculated fuel from GPS data");
-        } catch (error) {
-          console.error("❌ Error in fuel calculation:", error);
+            distance = haversineKm([prevLat, prevLon], [currLat, currLon]);
+            fuelUsed = calculateFuel(distance, parseFloat(pitch) || 0, movementNumeric, timeDiffHours);
+            console.log("⚙️ Calculated fuel from GPS data");
+          } catch (error) {
+            console.error("❌ Error in fuel calculation:", error);
+          }
         }
-      } 
-      else {
-        // Case 3: No fuel data - set to 0
-        fuelUsed = 0;
-        console.log("📊 No fuel data available");
-      }
+        
+        fuelCost = fuelUsed * FUEL_PRICE_PER_LITER;
 
-      fuelCost = fuelUsed * FUEL_PRICE_PER_LITER;
-
-      // Calculate RL if altitude is provided
-      if (altitude !== undefined && altitude !== null) {
-        rl = (parseFloat(altitude) + SEA_LEVEL_RL).toFixed(2);
+        // Calculate RL if altitude is provided
+        if (altitude !== undefined && altitude !== null) {
+          rl = (parseFloat(altitude) + SEA_LEVEL_RL).toFixed(2);
+        }
+      } else {
+        // NO GPS - just store whatever data we have, no calculations
+        console.log("📊 No GPS data - storing raw data only");
       }
 
       // Set MySQL timezone
@@ -822,8 +821,8 @@ const insertRealtimeData = (req, res) => {
           INSERT INTO realtime_sensor_data (
             device_id, equipment_name, timestamp, latitude, longitude, altitude,
             speed, pitch, roll, movement, vibration, pressure, distance,
-            fuel, fuel_cost, rl, region_id, count1, gps_status, z_axis, temperature
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            fuel, fuel_cost, rl, region_id, count1, gps_status, z_axis
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const values = [
@@ -840,14 +839,13 @@ const insertRealtimeData = (req, res) => {
           vibration !== undefined ? parseFloat(vibration) : null,
           pressure !== undefined ? parseFloat(pressure) : null,
           distance > 0 ? parseFloat(distance.toFixed(6)) : 0,
-          parseFloat(fuelUsed.toFixed(6)),
-          parseFloat(fuelCost.toFixed(4)),
+          fuelUsed > 0 ? parseFloat(fuelUsed.toFixed(6)) : 0,
+          fuelCost > 0 ? parseFloat(fuelCost.toFixed(4)) : 0,
           rl,
           region_id,
           count1 !== undefined ? count1 : null,
           gps_status || null,
-          z_axis !== undefined ? parseFloat(z_axis) : null,
-          temperature !== undefined ? parseFloat(temperature) : null
+          z_axis !== undefined ? parseFloat(z_axis) : null
         ];
 
         pool.query(insertQuery, values, (err, result) => {
@@ -856,23 +854,37 @@ const insertRealtimeData = (req, res) => {
             return res.status(500).json({ error: "Database error: " + err.message });
           }
 
-          // Simple success output
+          // Simple success output based on what was received
           console.log("\n✅ DATA STORED SUCCESSFULLY");
           console.log(`Device: ${device_id}`);
-          if (hasGPS) console.log(`📍 GPS: ${latitude}, ${longitude}`);
-          if (hasCount) console.log(`🔢 Count: ${count1}`);
-          if (fuelUsed > 0) console.log(`⛽ Fuel: ${(fuelUsed * 1000).toFixed(2)} mL`);
-          console.log(`ID: ${result.insertId}\n`);
+          
+          if (hasGPS) {
+            console.log(`📍 GPS: ${latitude}, ${longitude}`);
+            console.log(`⛽ Fuel: ${(fuelUsed * 1000).toFixed(2)} mL`);
+            console.log(`💰 Cost: ₹${fuelCost.toFixed(4)}`);
+            if (rl) console.log(`📏 RL: ${rl} m`);
+            if (distance > 0) console.log(`📐 Distance: ${(distance * 1000).toFixed(2)} m`);
+          }
+          
+          if (hasCount) {
+            console.log(`🔢 Count: ${count1}`);
+          }
+          
+          console.log(`🆔 Insert ID: ${result.insertId}\n`);
 
+          // Return appropriate response
           res.json({
             status: "success",
-            message: "Data stored successfully",
+            message: hasGPS ? "GPS data stored with calculations" : "Data stored successfully",
             inserted_id: result.insertId,
-            data_received: {
+            data_summary: {
               device_id,
               has_gps: hasGPS,
               has_count: hasCount,
-              fuel_calculated: fuelUsed > 0
+              ...(hasGPS && {
+                fuel_ml: (fuelUsed * 1000).toFixed(2),
+                distance_m: (distance * 1000).toFixed(2)
+              })
             }
           });
         });
