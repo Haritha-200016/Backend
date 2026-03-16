@@ -638,8 +638,9 @@ const insertRealtimeData = (req, res) => {
   });
 };*/
 
+
 const insertRealtimeData = (req, res) => {
-  // Receive ANY fields that come from the device
+
   const {
     device_id,
     equipment_name,
@@ -657,241 +658,258 @@ const insertRealtimeData = (req, res) => {
     timestamp,
     gps_status,
     z_axis
-    // REMOVED temperature - not needed
   } = req.body;
 
-  // ONLY device_id is required - nothing else!
   if (!device_id) {
-    return res.status(400).json({ error: "Missing required field: device_id" });
+    return res.status(400).json({ error: "device_id required" });
   }
 
-  // Constants
   const FUEL_PRICE_PER_LITER = 90;
   const SEA_LEVEL_RL = 525.5;
 
-  // Helper function: Calculate distance between two GPS points
-  const haversineKm = (point1, point2) => {
-    if (!point1 || !point2 || !point1[0] || !point1[1] || !point2[0] || !point2[1]) return 0;
-    
-    const [lat1, lon1] = point1;
-    const [lat2, lon2] = point2;
-    
+  const hasGPS =
+    latitude !== undefined &&
+    longitude !== undefined &&
+    latitude !== null &&
+    longitude !== null;
+
+  const hasCount =
+    count1 !== undefined &&
+    count1 !== null;
+
+  console.log(`📡 Device ${device_id} data:`, req.body);
+
+  /* ================= DISTANCE FUNCTION ================= */
+
+  const haversineKm = (p1, p2) => {
+
+    const [lat1, lon1] = p1;
+    const [lat2, lon2] = p2;
+
     const R = 6371;
+
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1 * Math.PI / 180) *
+      Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) ** 2;
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
     return R * c;
   };
 
-  // Helper function: Calculate fuel consumption
-  const calculateFuel = (distance, pitchValue, movementValue, timeDiffHours) => {
-    const BASE_CONSUMPTION = 0.3; // L/km
-    const IDLE_CONSUMPTION = 3; // L/hour
-    
-    if (distance > 0) {
-      let consumptionRate = BASE_CONSUMPTION;
-      const gradeFactor = 1 + Math.abs(pitchValue) * 0.05;
-      consumptionRate *= gradeFactor;
-      
-      if (movementValue > 5) consumptionRate *= 1.3; // Uphill
-      else if (movementValue < -5) consumptionRate *= 0.7; // Downhill
-      
-      return distance * consumptionRate;
-    } else if (timeDiffHours > 0) {
-      return timeDiffHours * IDLE_CONSUMPTION;
-    }
-    return 0;
-  };
+  /* ================= GET REGION ================= */
 
-  console.log(`📡 Received data from device ${device_id}:`, req.body);
+  pool.query(
+    `SELECT region_id FROM devices WHERE device_id=?`,
+    [device_id],
+    (err, regionResult) => {
 
-  // Check what data we received
-  const hasGPS = latitude !== undefined && latitude !== null && latitude !== 0 && 
-                 longitude !== undefined && longitude !== null && longitude !== 0;
-  const hasCount = count1 !== undefined && count1 !== null;
-
-  if (hasGPS) console.log(`📍 Device ${device_id} sent GPS data`);
-  if (hasCount) console.log(`🔢 Device ${device_id} sent count: ${count1}`);
-
-  // Get region_id from devices table
-  const getRegionQuery = `SELECT region_id FROM devices WHERE device_id = ?`;
-
-  pool.query(getRegionQuery, [device_id], (err, regionResults) => {
-    if (err) {
-      console.error("❌ Error fetching region_id:", err);
-      return res.status(500).json({ error: "Database error fetching region_id" });
-    }
-
-    if (regionResults.length === 0) {
-      console.error(`❌ Device ${device_id} not found in devices table`);
-      return res.status(404).json({ error: `Device ${device_id} not found` });
-    }
-
-    const region_id = regionResults[0].region_id;
-
-    // Get previous data point (for calculations) - only needed if we have GPS
-    const getPreviousPointQuery = `
-      SELECT latitude, longitude, timestamp
-      FROM realtime_sensor_data
-      WHERE device_id = ? AND latitude IS NOT NULL AND longitude IS NOT NULL
-      ORDER BY id DESC
-      LIMIT 1
-    `;
-
-    pool.query(getPreviousPointQuery, [device_id], (err, prevResults) => {
       if (err) {
-        console.error("❌ Error fetching previous data:", err);
+        console.error(err);
+        return res.status(500).json({ error: "region query error" });
       }
 
-      // Initialize variables
-      let distance = 0;
-      let timeDiffHours = 0;
-      let fuelUsed = 0;
-      let fuelCost = 0;
-      let rl = null;
-      let movementNumeric = 0;
-
-      // Calculate time difference if we have previous data
-      if (prevResults && prevResults.length > 0) {
-        try {
-          const prevTime = new Date(prevResults[0].timestamp);
-          const currentTime = timestamp ? new Date(timestamp) : new Date();
-          timeDiffHours = Math.max(0, (currentTime - prevTime) / 3600000);
-        } catch (error) {
-          console.error("❌ Error in time calculation:", error);
-        }
+      if (regionResult.length === 0) {
+        return res.status(404).json({ error: "device not found" });
       }
 
-      // Process movement if provided
-      if (movement) {
-        if (movement === "DOWN" || movement === "DOWNHILL") movementNumeric = -10;
-        else if (movement === "UP" || movement === "UPHILL") movementNumeric = 10;
-        else if (movement === "STABLE" || movement === "FLAT") movementNumeric = 0;
-        else movementNumeric = parseFloat(movement) || 0;
-      }
+      const region_id = regionResult[0].region_id;
 
-      // ========== FUEL CALCULATION - ONLY IF GPS DATA EXISTS ==========
-      if (hasGPS) {
-        if (fuel !== undefined && fuel !== null) {
-          // Case 1: Direct fuel sensor value provided
-          fuelUsed = parseFloat(fuel);
-          console.log("⛽ Using direct fuel sensor value");
-        } 
-        else if (prevResults && prevResults.length > 0 && prevResults[0].latitude) {
-          // Case 2: Calculate distance and fuel from GPS
-          try {
-            const prevLat = parseFloat(prevResults[0].latitude);
-            const prevLon = parseFloat(prevResults[0].longitude);
-            const currLat = parseFloat(latitude);
-            const currLon = parseFloat(longitude);
+      /* ===================================================== */
+      /* ============ CASE 1 : ONLY COUNT DEVICE ============== */
+      /* ===================================================== */
 
-            distance = haversineKm([prevLat, prevLon], [currLat, currLon]);
-            fuelUsed = calculateFuel(distance, parseFloat(pitch) || 0, movementNumeric, timeDiffHours);
-            console.log("⚙️ Calculated fuel from GPS data");
-          } catch (error) {
-            console.error("❌ Error in fuel calculation:", error);
-          }
-        }
-        
-        fuelCost = fuelUsed * FUEL_PRICE_PER_LITER;
+      if (hasCount && !hasGPS) {
 
-        // Calculate RL if altitude is provided
-        if (altitude !== undefined && altitude !== null) {
-          rl = (parseFloat(altitude) + SEA_LEVEL_RL).toFixed(2);
-        }
-      } else {
-        // NO GPS - just store whatever data we have, no calculations
-        console.log("📊 No GPS data - storing raw data only");
-      }
+        console.log("🔢 Dump counter device");
 
-      // Set MySQL timezone
-      const setTimezoneQuery = "SET SESSION time_zone = '+05:30'";
-
-      pool.query(setTimezoneQuery, (timezoneErr) => {
-        if (timezoneErr) {
-          console.warn("⚠️ Could not set timezone:", timezoneErr);
-        }
-
-        // INSERT QUERY - will store whatever data we have, NULL for missing fields
         const insertQuery = `
-          INSERT INTO realtime_sensor_data (
-            device_id, equipment_name, timestamp, latitude, longitude, altitude,
-            speed, pitch, roll, movement, vibration, pressure, distance,
-            fuel, fuel_cost, rl, region_id, count1, gps_status, z_axis
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO realtime_sensor_data
+          (device_id, timestamp, region_id, count1)
+          VALUES (?, ?, ?, ?)
         `;
 
         const values = [
           device_id,
-          equipment_name || null,
           timestamp ? new Date(timestamp) : new Date(),
-          latitude !== undefined ? parseFloat(latitude) : null,
-          longitude !== undefined ? parseFloat(longitude) : null,
-          altitude !== undefined ? parseFloat(altitude) : null,
-          speed !== undefined ? parseFloat(speed) : null,
-          pitch !== undefined ? parseFloat(pitch) : null,
-          roll !== undefined ? parseFloat(roll) : null,
-          movement || null,
-          vibration !== undefined ? parseFloat(vibration) : null,
-          pressure !== undefined ? parseFloat(pressure) : null,
-          distance > 0 ? parseFloat(distance.toFixed(6)) : 0,
-          fuelUsed > 0 ? parseFloat(fuelUsed.toFixed(6)) : 0,
-          fuelCost > 0 ? parseFloat(fuelCost.toFixed(4)) : 0,
-          rl,
           region_id,
-          count1 !== undefined ? count1 : null,
-          gps_status || null,
-          z_axis !== undefined ? parseFloat(z_axis) : null
+          count1
         ];
 
         pool.query(insertQuery, values, (err, result) => {
+
           if (err) {
-            console.error("❌ Database insert error:", err.sqlMessage);
-            return res.status(500).json({ error: "Database error: " + err.message });
+            console.error(err);
+            return res.status(500).json({ error: "insert error" });
           }
 
-          // Simple success output based on what was received
-          console.log("\n✅ DATA STORED SUCCESSFULLY");
-          console.log(`Device: ${device_id}`);
-          
-          if (hasGPS) {
-            console.log(`📍 GPS: ${latitude}, ${longitude}`);
-            console.log(`⛽ Fuel: ${(fuelUsed * 1000).toFixed(2)} mL`);
-            console.log(`💰 Cost: ₹${fuelCost.toFixed(4)}`);
-            if (rl) console.log(`📏 RL: ${rl} m`);
-            if (distance > 0) console.log(`📐 Distance: ${(distance * 1000).toFixed(2)} m`);
-          }
-          
-          if (hasCount) {
-            console.log(`🔢 Count: ${count1}`);
-          }
-          
-          console.log(`🆔 Insert ID: ${result.insertId}\n`);
+          console.log(`✅ Count stored: ${count1}`);
 
-          // Return appropriate response
-          res.json({
+          return res.json({
             status: "success",
-            message: hasGPS ? "GPS data stored with calculations" : "Data stored successfully",
-            inserted_id: result.insertId,
-            data_summary: {
-              device_id,
-              has_gps: hasGPS,
-              has_count: hasCount,
-              ...(hasGPS && {
-                fuel_ml: (fuelUsed * 1000).toFixed(2),
-                distance_m: (distance * 1000).toFixed(2)
-              })
-            }
+            message: "count stored",
+            inserted_id: result.insertId
           });
+
         });
-      });
-    });
-  });
+
+        return;
+      }
+
+      /* ===================================================== */
+      /* ================= GPS DEVICE ========================= */
+      /* ===================================================== */
+
+      pool.query(
+        `
+        SELECT latitude, longitude, timestamp
+        FROM realtime_sensor_data
+        WHERE device_id=?
+        AND latitude IS NOT NULL
+        AND longitude IS NOT NULL
+        ORDER BY id DESC
+        LIMIT 1
+        `,
+        [device_id],
+        (err, prev) => {
+
+          let distance = 0;
+          let fuelUsed = 0;
+          let fuelCost = 0;
+          let rl = null;
+          let timeDiffHours = 0;
+
+          if (prev && prev.length > 0) {
+
+            const prevLat = parseFloat(prev[0].latitude);
+            const prevLon = parseFloat(prev[0].longitude);
+
+            const currLat = parseFloat(latitude);
+            const currLon = parseFloat(longitude);
+
+            distance = haversineKm(
+              [prevLat, prevLon],
+              [currLat, currLon]
+            );
+
+            const prevTime = new Date(prev[0].timestamp);
+            const currTime = timestamp ? new Date(timestamp) : new Date();
+
+            timeDiffHours = Math.max(
+              0,
+              (currTime - prevTime) / 3600000
+            );
+          }
+
+          /* ================= MOVEMENT ================= */
+
+          let movementNumeric = 0;
+
+          if (movement === "UP") movementNumeric = 10;
+          else if (movement === "DOWN") movementNumeric = -10;
+
+          /* ================= FUEL ================= */
+
+          const BASE = 0.3;
+
+          let rate = BASE * (1 + Math.abs(pitch || 0) * 0.05);
+
+          if (movementNumeric > 5) rate *= 1.3;
+          if (movementNumeric < -5) rate *= 0.7;
+
+          fuelUsed = distance * rate;
+
+          fuelCost = fuelUsed * FUEL_PRICE_PER_LITER;
+
+          /* ================= RL ================= */
+
+          if (altitude !== undefined) {
+            rl = (parseFloat(altitude) + SEA_LEVEL_RL).toFixed(2);
+          }
+
+          /* ================= INSERT ================= */
+
+          const insertQuery = `
+          INSERT INTO realtime_sensor_data
+          (
+            device_id,
+            equipment_name,
+            timestamp,
+            latitude,
+            longitude,
+            altitude,
+            speed,
+            pitch,
+            roll,
+            movement,
+            vibration,
+            pressure,
+            distance,
+            fuel,
+            fuel_cost,
+            rl,
+            region_id,
+            gps_status,
+            z_axis
+          )
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          `;
+
+          const values = [
+
+            device_id,
+            equipment_name || null,
+            timestamp ? new Date(timestamp) : new Date(),
+            latitude || null,
+            longitude || null,
+            altitude || null,
+            speed || null,
+            pitch || null,
+            roll || null,
+            movement || null,
+            vibration || null,
+            pressure || null,
+            distance,
+            fuelUsed,
+            fuelCost,
+            rl,
+            region_id,
+            gps_status || null,
+            z_axis || null
+          ];
+
+          pool.query(insertQuery, values, (err, result) => {
+
+            if (err) {
+              console.error(err);
+              return res.status(500).json({ error: "insert error" });
+            }
+
+            console.log(`📍 Distance: ${(distance * 1000).toFixed(2)} m`);
+            console.log(`⛽ Fuel: ${(fuelUsed * 1000).toFixed(2)} mL`);
+
+            res.json({
+              status: "success",
+              message: "gps data stored",
+              inserted_id: result.insertId
+            });
+
+          });
+
+        }
+      );
+
+    }
+  );
+
 };
+
+
 // 3. FETCH DASHBOARD DATA (Updated to include calculated fields)
 const fetchDashboardData = (req, res) => {
   const { company, region } = req.query;
