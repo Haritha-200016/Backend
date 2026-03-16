@@ -17,7 +17,7 @@ app.use(express.json({ limit: "200mb" }));
 app.use(express.urlencoded({ extended: true, limit: "200mb" }));
 
 
-const PORT = 5001;
+const PORT = 5003;
 
 // Company/region APIs
 app.get('/getcompanies', fetch.getcompanies);
