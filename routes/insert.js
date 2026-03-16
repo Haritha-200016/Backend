@@ -640,7 +640,9 @@ const insertRealtimeData = (req, res) => {
 
 
 const insertRealtimeData = (req, res) => {
-console.log("📡 RAW BODY:", req.body);
+
+  console.log("📡 RAW BODY:", req.body);
+
   const {
     device_id,
     equipment_name,
@@ -667,11 +669,10 @@ console.log("📡 RAW BODY:", req.body);
   const FUEL_PRICE_PER_LITER = 90;
   const SEA_LEVEL_RL = 525.5;
 
-  const hasGPS =
-    latitude !== undefined &&
-    longitude !== undefined &&
-    latitude !== null &&
-    longitude !== null;
+  const lat = latitude !== "" ? parseFloat(latitude) : null;
+  const lon = longitude !== "" ? parseFloat(longitude) : null;
+
+  const hasGPS = lat !== null && lon !== null;
 
   const hasCount =
     count1 !== undefined &&
@@ -782,27 +783,15 @@ console.log("📡 RAW BODY:", req.body);
           let fuelUsed = 0;
           let fuelCost = 0;
           let rl = null;
-          let timeDiffHours = 0;
 
-          if (prev && prev.length > 0) {
+          if (prev && prev.length > 0 && hasGPS) {
 
             const prevLat = parseFloat(prev[0].latitude);
             const prevLon = parseFloat(prev[0].longitude);
 
-            const currLat = parseFloat(latitude);
-            const currLon = parseFloat(longitude);
-
             distance = haversineKm(
               [prevLat, prevLon],
-              [currLat, currLon]
-            );
-
-            const prevTime = new Date(prev[0].timestamp);
-            const currTime = timestamp ? new Date(timestamp) : new Date();
-
-            timeDiffHours = Math.max(
-              0,
-              (currTime - prevTime) / 3600000
+              [lat, lon]
             );
           }
 
@@ -828,7 +817,7 @@ console.log("📡 RAW BODY:", req.body);
 
           /* ================= RL ================= */
 
-          if (altitude !== undefined) {
+          if (altitude !== undefined && altitude !== null) {
             rl = (parseFloat(altitude) + SEA_LEVEL_RL).toFixed(2);
           }
 
@@ -855,9 +844,10 @@ console.log("📡 RAW BODY:", req.body);
             rl,
             region_id,
             gps_status,
-            z_axis
+            z_axis,
+            count1
           )
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
           `;
 
           const values = [
@@ -865,8 +855,8 @@ console.log("📡 RAW BODY:", req.body);
             device_id,
             equipment_name || null,
             timestamp ? new Date(timestamp) : new Date(),
-            latitude || null,
-            longitude || null,
+            lat,
+            lon,
             altitude || null,
             speed || null,
             pitch || null,
@@ -880,7 +870,8 @@ console.log("📡 RAW BODY:", req.body);
             rl,
             region_id,
             gps_status || null,
-            z_axis || null
+            z_axis || null,
+            count1 || null
           ];
 
           pool.query(insertQuery, values, (err, result) => {
@@ -908,7 +899,6 @@ console.log("📡 RAW BODY:", req.body);
   );
 
 };
-
 
 // 3. FETCH DASHBOARD DATA (Updated to include calculated fields)
 const fetchDashboardData = (req, res) => {
