@@ -14,6 +14,7 @@ from sklearn.cluster import DBSCAN
 from sklearn.metrics import silhouette_score
 from sklearn.linear_model import LinearRegression
 import warnings
+import traceback
 warnings.filterwarnings('ignore')
 
 def convert_numpy_types(obj):
@@ -69,7 +70,8 @@ class AIPoweredMiningAnalytics:
                     distances.append(0)
                 else:
                     distances.append(dist)
-            except:
+            except Exception as e:
+                print(f"  Distance calculation error: {e}", file=sys.stderr)
                 distances.append(0)
                 
         df['distance_m'] = distances
@@ -90,35 +92,38 @@ class AIPoweredMiningAnalytics:
     
     def detect_start_points_with_dbscan(self, df):
         """Use DBSCAN to automatically detect start/end points"""
-        coords = df[['lat', 'lon']].values
-        
-        # Apply DBSCAN clustering
-        db = DBSCAN(eps=self.eps, min_samples=20).fit(coords)
-        df['cluster'] = db.labels_
-        
-        # Filter out noise (-1)
-        valid = df[df['cluster'] != -1]
-        
-        if len(valid) > 0 and len(valid['cluster'].unique()) > 1:
-            try:
-                score = silhouette_score(coords[df['cluster'] != -1], 
-                                        df[df['cluster'] != -1]['cluster'])
-                print(f"  Clustering Quality: {round(score, 3)}", file=sys.stderr)
-            except:
-                pass
-        
-        # Find main start cluster (most frequent)
-        if len(valid) > 0:
-            start_cluster = valid['cluster'].value_counts().idxmax()
-            start_points = df[df['cluster'] == start_cluster]
+        try:
+            coords = df[['lat', 'lon']].values
             
-            start_lat = start_points['lat'].mean()
-            start_lon = start_points['lon'].mean()
+            # Apply DBSCAN clustering
+            db = DBSCAN(eps=self.eps, min_samples=20).fit(coords)
+            df['cluster'] = db.labels_
             
-            return (start_lat, start_lon)
-        else:
-            # Fallback: use first point
-            return (df.iloc[0]['lat'], df.iloc[0]['lon'])
+            # Filter out noise (-1)
+            valid = df[df['cluster'] != -1]
+            
+            if len(valid) > 0 and len(valid['cluster'].unique()) > 1:
+                try:
+                    score = silhouette_score(coords[df['cluster'] != -1], 
+                                            df[df['cluster'] != -1]['cluster'])
+                    print(f"  Clustering Quality: {round(score, 3)}", file=sys.stderr)
+                except:
+                    pass
+            
+            # Find main start cluster (most frequent)
+            if len(valid) > 0:
+                start_cluster = valid['cluster'].value_counts().idxmax()
+                start_points = df[df['cluster'] == start_cluster]
+                
+                start_lat = start_points['lat'].mean()
+                start_lon = start_points['lon'].mean()
+                
+                return (start_lat, start_lon)
+        except Exception as e:
+            print(f"  DBSCAN error: {e}", file=sys.stderr)
+            
+        # Fallback: use first point
+        return (df.iloc[0]['lat'], df.iloc[0]['lon'])
     
     def detect_trips_with_ai(self, df):
         """AI-powered trip detection using DBSCAN and radius"""
@@ -157,8 +162,23 @@ class AIPoweredMiningAnalytics:
         """Train Linear Regression model to predict fuel consumption"""
         # Prepare features
         features = ['distance_m', 'pitch', 'alt', 'rl']
-        X = df[features].fillna(0)
+        # Check if columns exist
+        available_features = []
+        for f in features:
+            if f in df.columns:
+                available_features.append(f)
+        
+        if not available_features:
+            print(f"  No features available for model training", file=sys.stderr)
+            return None, {}, 0
+            
+        X = df[available_features].fillna(0)
         y = df['fuel'].fillna(0)
+        
+        # Check if we have enough data
+        if len(X) < 2 or len(y) < 2:
+            print(f"  Insufficient data for model training", file=sys.stderr)
+            return None, {}, 0
         
         # Train model
         model = LinearRegression()
@@ -169,7 +189,7 @@ class AIPoweredMiningAnalytics:
         print(f"  Fuel Model R²: {round(r2_score, 3)}", file=sys.stderr)
         
         # Get feature importance
-        importance = dict(zip(features, model.coef_))
+        importance = dict(zip(available_features, model.coef_))
         
         return model, importance, r2_score
     
@@ -198,7 +218,8 @@ class AIPoweredMiningAnalytics:
     
     def analyze_device(self, device_id, df):
         """Complete AI-powered analysis for a single device"""
-        if len(df) < 0:       #length of fetch data 
+        if len(df) < 10:  # Changed from < 0 to < 10 - require minimum data
+            print(f"  Device {device_id}: Insufficient data ({len(df)} records, minimum 10 required)", file=sys.stderr)
             return None
         
         try:
@@ -214,10 +235,29 @@ class AIPoweredMiningAnalytics:
             # Train fuel prediction model
             model, feature_importance, r2_score = self.train_fuel_prediction_model(df)
             
-            # Calculate AI predictions
-            features = ['distance_m', 'pitch', 'alt', 'rl']
-            X_pred = df[features].fillna(0)
-            df['predicted_fuel'] = model.predict(X_pred)
+            # Calculate AI predictions if model exists
+            if model is not None:
+                features = []
+                if 'distance_m' in df.columns:
+                    features.append('distance_m')
+                if 'pitch' in df.columns:
+                    features.append('pitch')
+                if 'alt' in df.columns:
+                    features.append('alt')
+                if 'rl' in df.columns:
+                    features.append('rl')
+                
+                if features:
+                    X_pred = df[features].fillna(0)
+                    df['predicted_fuel'] = model.predict(X_pred)
+                else:
+                    df['predicted_fuel'] = df['fuel']
+                    feature_importance = {}
+                    r2_score = 0
+            else:
+                df['predicted_fuel'] = df['fuel']
+                feature_importance = {}
+                r2_score = 0
             
             # Basic metrics
             total_distance = float(df['distance_km'].sum())
@@ -263,7 +303,7 @@ class AIPoweredMiningAnalytics:
                 mask = df['gradient_class'] == gradient
                 grad_data = df[mask]
                 
-                if len(grad_data) > 0:    #lenght of fetch data
+                if len(grad_data) > 0:
                     distance = float(grad_data['distance_km'].sum())
                     fuel = float(grad_data['fuel'].sum())
                     
@@ -339,6 +379,7 @@ class AIPoweredMiningAnalytics:
             
         except Exception as e:
             print(f"Error analyzing device {device_id}: {str(e)}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
             return None
 
 class ExcelReportGenerator:
@@ -681,6 +722,7 @@ def main():
         params = json.loads(input_data)
         df = pd.DataFrame(params.get('data', []))
         
+        # Check if we have any data
         if df.empty:
             print(json.dumps({
                 'status': 'success',
@@ -691,21 +733,46 @@ def main():
             }))
             return
         
-        # Ensure required columns
+        # Check minimum data requirement
+        if len(df) < 10:
+            print(json.dumps({
+                'status': 'error',
+                'error': f'Insufficient data: {len(df)} records (minimum 10 required)'
+            }))
+            return
+        
+        # Ensure required columns exist or add defaults
         required = ['time', 'lat', 'lon', 'pitch', 'fuel', 'speed', 'alt']
         for col in required:
             if col not in df.columns:
-                df[col] = 0
+                if col == 'time':
+                    df[col] = pd.Timestamp.now()
+                elif col == 'speed':
+                    df[col] = 0
+                elif col == 'alt':
+                    df[col] = 0
+                else:
+                    df[col] = 0
+                print(f"  Added missing column: {col}", file=sys.stderr)
         
         # Add RL if not present
         if 'rl' not in df.columns:
             df['rl'] = df['alt'] + 525.5  # Sea level constant
         
+        # Add cost if not present
+        if 'cost' not in df.columns and 'fuel' in df.columns:
+            df['cost'] = df['fuel'] * 94.5
+        
         # Convert time
-        df['time'] = pd.to_datetime(df['time'])
+        try:
+            df['time'] = pd.to_datetime(df['time'])
+        except:
+            df['time'] = pd.Timestamp.now()
+        
         df = df.sort_values('time').reset_index(drop=True)
         
         print(f"Processing {len(df)} records", file=sys.stderr)
+        print(f"Columns: {list(df.columns)}", file=sys.stderr)
         
         # Initialize AI analyzer
         analyzer = AIPoweredMiningAnalytics()
@@ -720,8 +787,8 @@ def main():
             
             device_df = df[df['device_id'] == device_id].copy()
             
-            if len(device_df) < 0:
-                print(f"Device {device_id}: insufficient data", file=sys.stderr)
+            if len(device_df) < 10:
+                print(f"Device {device_id}: insufficient data ({len(device_df)} records)", file=sys.stderr)
                 continue
             
             result = analyzer.analyze_device(device_id, device_df)
@@ -764,11 +831,14 @@ def main():
         
     except Exception as e:
         import traceback
-        print(json.dumps({
+        error_output = {
             'status': 'error',
             'error': str(e),
             'traceback': traceback.format_exc()
-        }), file=sys.stderr)
+        }
+        print(json.dumps(error_output), file=sys.stderr)
+        # Also print to stdout for the caller to see
+        print(json.dumps(error_output))
 
 if __name__ == '__main__':
     main()
