@@ -640,7 +640,7 @@ const insertRealtimeData = (req, res) => {
 
 
 const insertRealtimeData = (req, res) => {
-
+console.log("📡 RAW BODY:", req.body);
   const {
     device_id,
     equipment_name,
