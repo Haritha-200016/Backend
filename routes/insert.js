@@ -650,9 +650,10 @@ const insertRealtimeData = (req, res) => {
     roll,
     movement,
     vibration,
-    fuel,        // NEW
+    fuel,
     pressure,
-    count1     // NEW
+    count1,
+    timestamp
   } = req.body;
 
   if (!device_id) {
@@ -660,25 +661,76 @@ const insertRealtimeData = (req, res) => {
   }
 
   const FUEL_PRICE_PER_LITER = 90;
+  const SEA_LEVEL_RL = 525.5;
+
+  // Haversine formula to calculate distance between two points in km
+  const haversineKm = (point1, point2) => {
+    const [lat1, lon1] = point1;
+    const [lat2, lon2] = point2;
+    
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  // Fuel calculation function
+  const calculateFuelAndCost = (distance, pitchValue, movementValue, deviceId, timeDiffHours) => {
+    let fuel = 0;
+    const BASE_CONSUMPTION = 0.3;
+    
+    if (distance > 0) {
+      let consumptionRate = BASE_CONSUMPTION;
+      const gradeFactor = 1 + Math.abs(pitchValue) * 0.05;
+      consumptionRate *= gradeFactor;
+      
+      if (movementValue > 5) {
+        consumptionRate *= 1.3;
+      } else if (movementValue < -5) {
+        consumptionRate *= 0.7;
+      }
+      
+      fuel = distance * consumptionRate;
+    } else if (timeDiffHours > 0) {
+      const IDLE_CONSUMPTION = 3;
+      fuel = timeDiffHours * IDLE_CONSUMPTION;
+    }
+    
+    return { fuel };
+  };
+
+  console.log(`📡 Received data from device ${device_id}:`, req.body);
+
+  // Check what type of data this is
+  const hasFullData = latitude !== undefined && longitude !== undefined;
+  const isCountOnly = count1 !== undefined && !hasFullData;
+
+  if (isCountOnly) {
+    console.log(`🔢 Device ${device_id} sending count-only data:`, count1);
+  }
 
   // Get region_id from devices table
   const getRegionQuery = `SELECT region_id FROM devices WHERE device_id = ?`;
 
   db.query(getRegionQuery, [device_id], (err, regionResults) => {
-
     if (err) {
       console.error("❌ Error fetching region_id:", err);
       return res.status(500).json({ error: "Database error fetching region_id" });
     }
 
     if (regionResults.length === 0) {
-      console.error(`❌ Device ${device_id} not found`);
+      console.error(`❌ Device ${device_id} not found in devices table`);
       return res.status(404).json({ error: `Device ${device_id} not found` });
     }
 
     const region_id = regionResults[0].region_id;
 
-    // Get previous GPS point
+    // Get previous data point (for calculations)
     const getPreviousPointQuery = `
       SELECT latitude, longitude, timestamp
       FROM realtime_sensor_data
@@ -688,40 +740,44 @@ const insertRealtimeData = (req, res) => {
     `;
 
     db.query(getPreviousPointQuery, [device_id], (err, prevResults) => {
+      if (err) {
+        console.error("❌ Error fetching previous data:", err);
+        // Continue anyway, just won't have distance calculation
+      }
 
       let distance = 0;
       let timeDiffHours = 0;
 
-      if (err) {
-        console.error("❌ Error fetching previous data:", err);
-        return res.status(500).json({ error: "Database error fetching previous data" });
-      }
-
-      // Distance calculation
-      if (prevResults.length > 0 && prevResults[0].latitude && prevResults[0].longitude) {
+      // Calculate distance only if we have full GPS data
+      if (hasFullData && prevResults && prevResults.length > 0 && 
+          prevResults[0].latitude && prevResults[0].longitude) {
         try {
-
           const prevLat = parseFloat(prevResults[0].latitude);
           const prevLon = parseFloat(prevResults[0].longitude);
-
           const currLat = parseFloat(latitude);
           const currLon = parseFloat(longitude);
 
           distance = haversineKm([prevLat, prevLon], [currLat, currLon]);
 
           const prevTime = new Date(prevResults[0].timestamp);
-          const currentTime = new Date();
-
+          const currentTime = timestamp ? new Date(timestamp) : new Date();
           timeDiffHours = Math.max(0, (currentTime - prevTime) / 3600000);
-
         } catch (error) {
           console.error("❌ Error in distance calculation:", error);
         }
+      } else if (prevResults && prevResults.length > 0) {
+        // Still calculate time difference even without GPS
+        try {
+          const prevTime = new Date(prevResults[0].timestamp);
+          const currentTime = timestamp ? new Date(timestamp) : new Date();
+          timeDiffHours = Math.max(0, (currentTime - prevTime) / 3600000);
+        } catch (error) {
+          console.error("❌ Error in time calculation:", error);
+        }
       }
 
-      // Movement numeric conversion
+      // Process movement if provided
       let movementNumeric = 0;
-
       if (movement) {
         if (movement === "DOWN" || movement === "DOWNHILL") movementNumeric = -10;
         else if (movement === "UP" || movement === "UPHILL") movementNumeric = 10;
@@ -729,23 +785,16 @@ const insertRealtimeData = (req, res) => {
         else movementNumeric = parseFloat(movement) || 0;
       }
 
-      // -------------------------
-      // Fuel Logic
-      // -------------------------
-
+      // FUEL CALCULATION - HANDLES BOTH CASES
       let fuelUsed = 0;
       let fuelCost = 0;
 
       if (fuel !== undefined && fuel !== null) {
-
-        // Fuel sensor value
+        // Case 1: Direct fuel sensor value provided
         fuelUsed = parseFloat(fuel);
-
         console.log("⛽ Using Fuel Sensor Value");
-
-      } else {
-
-        // Calculate fuel
+      } else if (hasFullData) {
+        // Case 2: Full GPS data available, calculate fuel
         const calcResult = calculateFuelAndCost(
           distance,
           parseFloat(pitch) || 0,
@@ -753,31 +802,31 @@ const insertRealtimeData = (req, res) => {
           device_id,
           timeDiffHours
         );
-
         fuelUsed = calcResult.fuel;
-
-        console.log("⚙️ Using Calculated Fuel");
+        console.log("⚙️ Using Calculated Fuel from GPS data");
+      } else {
+        // Case 3: Minimal data (count only) - use idle consumption based on time
+        const IDLE_CONSUMPTION = 3;
+        fuelUsed = timeDiffHours * IDLE_CONSUMPTION;
+        console.log("⏱️ Using Idle Fuel Consumption (time-based)");
       }
 
-      // Cost for both cases
       fuelCost = fuelUsed * FUEL_PRICE_PER_LITER;
 
-      // RL calculation
-      const rl =
-        altitude !== undefined
-          ? (parseFloat(altitude) + SEA_LEVEL_RL).toFixed(2)
-          : null;
+      // RL calculation only if altitude provided
+      const rl = (altitude !== undefined && altitude !== null)
+        ? (parseFloat(altitude) + SEA_LEVEL_RL).toFixed(2)
+        : null;
 
       // Set MySQL timezone
       const setTimezoneQuery = "SET SESSION time_zone = '+05:30'";
 
       db.query(setTimezoneQuery, (timezoneErr) => {
-
         if (timezoneErr) {
           console.warn("⚠️ Could not set timezone:", timezoneErr);
         }
 
-        // Insert query
+        // Insert query - handles all fields, will be NULL if not provided
         const insertQuery = `
           INSERT INTO realtime_sensor_data (
             device_id,
@@ -798,14 +847,15 @@ const insertRealtimeData = (req, res) => {
             rl,
             region_id,
             count1
-          ) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const values = [
           device_id,
           equipment_name || null,
-          latitude ? parseFloat(latitude) : null,
-          longitude ? parseFloat(longitude) : null,
+          timestamp ? new Date(timestamp) : new Date(),
+          latitude !== undefined ? parseFloat(latitude) : null,
+          longitude !== undefined ? parseFloat(longitude) : null,
           altitude !== undefined ? parseFloat(altitude) : null,
           speed !== undefined ? parseFloat(speed) : null,
           pitch !== undefined ? parseFloat(pitch) : null,
@@ -813,16 +863,15 @@ const insertRealtimeData = (req, res) => {
           movement || null,
           vibration !== undefined ? parseFloat(vibration) : null,
           pressure !== undefined ? parseFloat(pressure) : null,
-          parseFloat(distance.toFixed(6)),
+          distance > 0 ? parseFloat(distance.toFixed(6)) : 0,
           parseFloat(fuelUsed.toFixed(6)),
           parseFloat(fuelCost.toFixed(4)),
           rl,
           region_id,
-          count1 || null
+          count1 !== undefined ? count1 : null
         ];
 
         db.query(insertQuery, values, (err, result) => {
-
           if (err) {
             console.error("❌ Database insert error:", err.sqlMessage);
             return res.status(500).json({ error: "Database error: " + err.message });
@@ -835,41 +884,45 @@ const insertRealtimeData = (req, res) => {
           console.log(`Device ID: ${device_id}`);
           console.log(`Equipment: ${equipment_name || "N/A"}`);
 
-          console.log(`Position: ${latitude}, ${longitude}`);
-          console.log(`Altitude: ${altitude || 0} m`);
+          if (hasFullData) {
+            console.log(`Position: ${latitude}, ${longitude}`);
+            console.log(`Altitude: ${altitude || 0} m`);
+            console.log(`Speed: ${speed || 0}`);
+            console.log(`Pitch: ${pitch || 0}`);
+            console.log(`Roll: ${roll || 0}`);
+            console.log(`Movement: ${movement || "N/A"}`);
+            console.log(`Vibration: ${vibration || 0}`);
+            console.log(`Pressure: ${pressure || 0}`);
+            console.log(`RL: ${rl || 0} m`);
+          } else if (count1 !== undefined) {
+            console.log(`Count1: ${count1}`);
+          }
 
-          console.log(`Speed: ${speed || 0}`);
-          console.log(`Pitch: ${pitch || 0}`);
-          console.log(`Roll: ${roll || 0}`);
-
-          console.log(`Movement: ${movement || "N/A"}`);
-          console.log(`Vibration: ${vibration || 0}`);
-          console.log(`Pressure: ${pressure || 0}`);
-
-          console.log(`RL: ${rl || 0} m`);
-
+          console.log(`Region ID: ${region_id}`);
           console.log(`Distance: ${(distance * 1000).toFixed(2)} m`);
-
           console.log(`Fuel Used: ${(fuelUsed * 1000).toFixed(2)} mL`);
           console.log(`Fuel Cost: ₹${fuelCost.toFixed(4)}`);
-           console.log(`dump count: ${count1}`);
-
+          console.log(`Timestamp: ${timestamp || new Date().toISOString()}`);
+          console.log(`Insert ID: ${result.insertId}`);
           console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
           res.json({
             status: "success",
             message: "Data stored successfully",
-            inserted_id: result.insertId
+            inserted_id: result.insertId,
+            data_summary: {
+              device_id,
+              has_gps: hasFullData,
+              has_count: count1 !== undefined,
+              fuel_used_ml: (fuelUsed * 1000).toFixed(2),
+              fuel_cost: fuelCost.toFixed(4),
+              distance_m: (distance * 1000).toFixed(2)
+            }
           });
-
         });
-
       });
-
     });
-
   });
-
 };
 // 3. FETCH DASHBOARD DATA (Updated to include calculated fields)
 const fetchDashboardData = (req, res) => {
