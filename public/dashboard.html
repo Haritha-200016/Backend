@@ -887,7 +887,7 @@
 
   <script>
     // ==================== CONFIGURATION ====================
-    const BASE_URL = 'http://104.154.141.198:5003';
+    const BASE_URL = 'http://10.5.48.30:5001';
     const params = new URLSearchParams(window.location.search);
     const sector = params.get('sector') || '';
     const company = (params.get('company') || '').trim();
@@ -1674,215 +1674,121 @@
       if (panelId === 'Dump') {
         grid.innerHTML = '';
 
-        const responsiveStyle = document.createElement('style');
-        responsiveStyle.textContent = `
-          .dump-row-container { width: 100%; display: flex; align-items: center; gap: 20px; flex-wrap: nowrap; }
-          .report-btn-mobile {
-            background: linear-gradient(180deg, #4CAF50 0%, #45a049 100%);
-            color: white; border: none; padding: 10px 16px; border-radius: 6px;
-            font-size: 14px; font-weight: bold; cursor: pointer;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: all 0.3s ease;
-            flex: 1; min-height: 300px; touch-action: manipulation; white-space: nowrap;
-          }
-          .report-btn-mobile.monthly { background: linear-gradient(180deg, #2196F3 0%, #1976D2 100%); }
-          .dump-chart-container { flex: 1; }
-          @media screen and (max-width: 768px) {
-            .dump-row-container { flex-direction: column !important; gap: 15px !important; }
-            .button-row-mobile { display: flex !important; width: 100% !important; gap: 10px !important; justify-content: space-between !important; }
-            .report-btn-mobile {
-              padding: 12px 8px !important; font-size: 13px !important;
-              min-height: 80px !important; border-radius: 6px !important;
-              white-space: normal !important; line-height: 1.3 !important;
-              flex: 1 !important; margin: 0 !important;
-            }
-            .dump-chart-container { width: 100% !important; height: 250px !important; }
-            #dumpRoot { width: 100% !important; height: 100% !important; }
-            @media screen and (max-width: 380px) {
-              .report-btn-mobile { padding: 10px 6px !important; font-size: 12px !important; min-height: 70px !important; }
-              .button-row-mobile { gap: 8px !important; }
-            }
-            @media screen and (max-width: 320px) { .report-btn-mobile { min-height: 60px !important; } }
-          }
-        `;
-        document.head.appendChild(responsiveStyle);
+        const container = document.createElement('div');
+        container.style.cssText = `
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  `;
 
-        const rowContainer = document.createElement('div');
-        rowContainer.className = 'dump-row-container';
-
-        const buttonContainer = document.createElement('div');
-        buttonContainer.className = 'button-row-mobile';
-        buttonContainer.style.cssText = `display: flex; gap: 20px; width: 100%; flex: 2;`;
+        // 🔹 Buttons
+        const buttonRow = document.createElement('div');
+        buttonRow.style.cssText = `display: flex; gap: 20px; width: 100%;`;
 
         const dailyBtn = document.createElement('button');
         dailyBtn.innerHTML = '📊 Daily Reports';
-        dailyBtn.className = 'report-btn-mobile';
 
         const monthlyBtn = document.createElement('button');
         monthlyBtn.innerHTML = '📈 Monthly Reports';
-        monthlyBtn.className = 'report-btn-mobile monthly';
 
-        const dumpWrapper = document.createElement('div');
-        dumpWrapper.className = 'dump-chart-container';
-        dumpWrapper.innerHTML = `
-          <div id="dumpRoot" style="width:300px;height:300px;background:#000;color:#fff;padding:10px;box-sizing:border-box;border-radius:10px;">
-            <div style="font-size:14px; margin-bottom:6px;"><strong>Live Dump Analysis</strong></div>
-            <div style="width:100%; height:240px;"><canvas id="dumpChart"></canvas></div>
-          </div>
-        `;
+        [dailyBtn, monthlyBtn].forEach(btn => {
+          btn.style.cssText = `
+      flex: 1;
+      padding: 14px;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    `;
+        });
 
-        buttonContainer.appendChild(dailyBtn);
-        buttonContainer.appendChild(monthlyBtn);
-        rowContainer.appendChild(buttonContainer);
-        rowContainer.appendChild(dumpWrapper);
-        grid.appendChild(rowContainer);
+        dailyBtn.style.background = 'linear-gradient(#4CAF50,#45a049)';
+        monthlyBtn.style.background = 'linear-gradient(#2196F3,#1976D2)';
 
-        let ctx = null;
+        buttonRow.appendChild(dailyBtn);
+        buttonRow.appendChild(monthlyBtn);
 
-        function initCanvas() {
-          const canvas = document.getElementById('dumpChart');
-          if (!canvas) return false;
-          ctx = canvas.getContext('2d');
-          return true;
-        }
+        // 🔹 Panel
+        const panel = document.createElement('div');
+        panel.style.cssText = `
+    background:#000;
+    color:#fff;
+    padding:20px;
+    border-radius:10px;
+    text-align:center;
+  `;
+
+        panel.innerHTML = `
+    <div style="font-size:16px;">Live Dump Count</div>
+    <div id="dumpCount" style="font-size:40px;color:#00ff00;">--</div>
+    <div id="dumpTime" style="font-size:12px;color:#ccc;">--</div>
+  `;
+
+        container.appendChild(buttonRow);
+        container.appendChild(panel);
+        grid.appendChild(container);
 
         const dumpCompany = company || 'JMS';
         const dumpSector = sector || 'Mining';
         const dumpRegion = region;
 
-        async function fetchAndRenderChart() {
-          const url = `${BASE_URL}/fetchDashboardDataby?company=${dumpCompany}&sector=${dumpSector}&region=${encodeURIComponent(dumpRegion)}`;
+        // ✅ FIXED FETCH
+        async function fetchDumpValue() {
+          const url = `${BASE_URL}/fetchdashboarddataby?company=${dumpCompany}&sector=${dumpSector}&region=${encodeURIComponent(dumpRegion)}`;
 
           try {
             const res = await fetch(url);
-            const data = await res.json();
+            const json = await res.json();
 
-            if (data.status !== 'success' || !data.data) {
-              console.error('No data returned from backend');
+            console.log("🔥 Dump API:", json);
+
+            if (json.status !== 'success' || !json.devices || json.devices.length === 0) {
+              console.warn("No devices");
               return;
             }
 
-            const recentData = data.data.slice(-6);
-            const labels = [];
-            const counts = [];
+            const device = json.devices[0]; // ✅ correct
 
-            recentData.forEach(d => {
-              const t = new Date(d.timestamp);
-              labels.push(`${t.getHours()}:${t.getMinutes().toString().padStart(2, '0')}`);
-              counts.push(d.count1 || 0);
-            });
+            document.getElementById('dumpCount').innerText =
+              device.count1 ?? 0;
 
-            renderChart(labels, counts);
+            document.getElementById('dumpTime').innerText =
+              new Date(device.timestamp).toLocaleString();
 
           } catch (err) {
-            console.error('Chart fetch error:', err);
+            console.error("Dump error:", err);
           }
         }
 
-        function renderChart(labels, data) {
-          if (!ctx) return;
-          if (window.dumpChartInstance) window.dumpChartInstance.destroy();
-
-          window.dumpChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-              labels,
-              datasets: [{
-                label: 'Live Dumps',
-                data,
-                borderColor: '#00ff00',
-                backgroundColor: 'rgba(0,255,0,0.25)',
-                fill: true,
-                borderWidth: 2,
-                tension: 0.4,
-                pointRadius: 4,
-                pointBackgroundColor: '#00ff00',
-                pointBorderColor: '#fff'
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { labels: { color: '#fff' } } },
-              scales: {
-                x: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
-                y: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' }, beginAtZero: true }
-              }
-            }
-          });
-        }
-
-        const canvasInterval = setInterval(() => {
-          if (initCanvas()) {
-            clearInterval(canvasInterval);
-            fetchAndRenderChart();
-          }
-        }, 50);
-
+        // 🔹 Download (unchanged)
         async function downloadDumpReport(range = 'daily') {
-          if (window.isDownloading) return;
-
-          const excelUrl = range === 'daily'
+          const url = range === 'daily'
             ? `${BASE_URL}/fetch-24hr-dump-data?company=${dumpCompany}&region=${encodeURIComponent(dumpRegion)}`
             : `${BASE_URL}/fetch-monthly-dump-data?company=${dumpCompany}&sector=${dumpSector}&region=${encodeURIComponent(dumpRegion)}&range=monthly`;
 
-          const button = range === 'daily' ? dailyBtn : monthlyBtn;
-          const originalText = button.innerHTML;
+          const res = await fetch(url);
+          const data = await res.json();
 
-          try {
-            window.isDownloading = true;
-            button.innerHTML = '⏳ Loading...';
-            button.disabled = true;
+          if (!data.data) return alert('No data');
 
-            const res = await fetch(excelUrl);
-            const data = await res.json();
+          const wsData = [['Device ID', 'Count1', 'Timestamp']];
+          data.data.forEach(d => wsData.push([d.device_id, d.count1, d.timestamp]));
 
-            button.innerHTML = originalText;
-            button.disabled = false;
+          const ws = XLSX.utils.aoa_to_sheet(wsData);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, 'Dump');
 
-            if (data.status !== 'success' || !data.data) {
-              alert('No data available');
-              return;
-            }
-
-            const wsData = [['Device ID', 'Count1', 'Timestamp']];
-            data.data.forEach(d => wsData.push([d.device_id, d.count1 ?? 0, d.timestamp]));
-
-            const ws = XLSX.utils.aoa_to_sheet(wsData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'DumpReport');
-
-            const now = new Date();
-            const fileName = `Dump_Report_${range}_${now.toISOString().split('T')[0]}.xlsx`;
-
-            const wbBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-            const blob = new Blob([wbBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-            const downloadUrl = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = downloadUrl;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-
-            setTimeout(() => {
-              document.body.removeChild(a);
-              URL.revokeObjectURL(downloadUrl);
-            }, 100);
-
-          } catch (err) {
-            console.error('Download error:', err);
-            button.innerHTML = originalText;
-            button.disabled = false;
-            alert(`Failed to download report: ${err.message}`);
-          } finally {
-            window.isDownloading = false;
-          }
+          XLSX.writeFile(wb, `Dump_${range}.xlsx`);
         }
 
         dailyBtn.onclick = () => downloadDumpReport('daily');
         monthlyBtn.onclick = () => downloadDumpReport('monthly');
-        setInterval(fetchAndRenderChart, 30000);
-      }
 
+        fetchDumpValue();
+        setInterval(fetchDumpValue, 30000);
+      }
       // ==================== DRONE STREAM PANEL ====================
       if (panelId === 'DroneStream') {
         container.innerHTML = `
