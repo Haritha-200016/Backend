@@ -692,23 +692,40 @@ const insertRealtimeData = (req, res) => {
     count1 !== undefined &&
     count1 !== null;
 
-  /* ========= TIMESTAMP CONVERSION FUNCTION ========= */
-  const getISTTimestamp = (ts) => {
+  /* ========= TIMESTAMP CONVERSION TO IST ========= */
+  const convertToIST = (ts) => {
     let date;
+    
     if (ts) {
+      // If timestamp provided, parse it
       date = new Date(ts);
+      console.log("🕐 Original timestamp (UTC):", date.toISOString());
     } else {
+      // If no timestamp, use current time
       date = new Date();
+      console.log("🕐 No timestamp provided, using current UTC:", date.toISOString());
     }
     
-    // Convert to IST by adding 5 hours 30 minutes
-    const istDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+    // Convert UTC to IST by adding 5 hours 30 minutes
+    // MySQL expects format: YYYY-MM-DD HH:MM:SS
+    const istTime = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
     
-    // Format as MySQL datetime string
-    return istDate.toISOString().slice(0, 19).replace('T', ' ');
+    // Format for MySQL
+    const year = istTime.getFullYear();
+    const month = String(istTime.getMonth() + 1).padStart(2, '0');
+    const day = String(istTime.getDate()).padStart(2, '0');
+    const hours = String(istTime.getHours()).padStart(2, '0');
+    const minutes = String(istTime.getMinutes()).padStart(2, '0');
+    const seconds = String(istTime.getSeconds()).padStart(2, '0');
+    
+    const formattedIST = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    
+    console.log("🕐 Converted IST:", formattedIST);
+    return formattedIST;
   };
 
-  const formattedTimestamp = getISTTimestamp(timestamp);
+  // Get IST timestamp
+  const istTimestamp = convertToIST(timestamp);
 
   /* ================= DISTANCE FUNCTION ================= */
 
@@ -767,7 +784,7 @@ const insertRealtimeData = (req, res) => {
 
         const values = [
           device_id,
-          formattedTimestamp,  // CHANGED: Now using IST timestamp
+          istTimestamp,  // CHANGED: Using IST timestamp
           region_id,
           count1
         ];
@@ -779,7 +796,7 @@ const insertRealtimeData = (req, res) => {
             return res.status(500).json({ error: "insert error" });
           }
 
-          console.log(`✅ Count stored: ${count1} at ${formattedTimestamp}`);
+          console.log(`✅ Count stored: ${count1} at ${istTimestamp}`);
 
           return res.json({
             status: "success",
@@ -884,7 +901,7 @@ const insertRealtimeData = (req, res) => {
 
             device_id,
             equipment_name || null,
-            formattedTimestamp,  // CHANGED: Now using IST timestamp
+            istTimestamp,  // CHANGED: Using IST timestamp
             lat,
             lon,
             alt,
@@ -913,7 +930,7 @@ const insertRealtimeData = (req, res) => {
 
             console.log(`📍 Distance: ${(distance * 1000).toFixed(2)} m`);
             console.log(`⛽ Fuel: ${(fuelUsed * 1000).toFixed(2)} mL`);
-            console.log(`🕐 Stored at IST: ${formattedTimestamp}`);
+            console.log(`🕐 Stored at IST: ${istTimestamp}`);
 
             res.json({
               status: "success",
