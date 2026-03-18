@@ -1715,15 +1715,15 @@
         panel.style.cssText = `
     background:#000;
     color:#fff;
-    padding:20px;
+    padding:50px;
     border-radius:10px;
     text-align:center;
   `;
 
         panel.innerHTML = `
-    <div style="font-size:16px;">Live Dump Count</div>
-    <div id="dumpCount" style="font-size:40px;color:#00ff00;">--</div>
-    <div id="dumpTime" style="font-size:12px;color:#ccc;">--</div>
+    <div style="font-size:20px;">Live Dump Count</div>
+    <div id="dumpCount" style="font-size:120px;color:#00ff00;">--</div>
+    <div id="dumpTime" style="font-size:20px;color:#ccc;">--</div>
   `;
 
         container.appendChild(buttonRow);
@@ -4500,12 +4500,10 @@
                 <tr><td style="color:#8fe;font-weight:700;width=42%">Excavator Pitch</td><td>${haulers['D7']?.pitchDisplay || '0°'}</td></tr>
                 <tr><td style="color:#8fe;font-weight:700;width=42%">Excavator Vibration</td><td style="color:${d7Vibration <= 2 ? '#4CAF50' : d7Vibration <= 4 ? '#FF9800' : '#F44336'}">${d7VibrationLabel}</td></tr>
                 <tr><td style="color:#8fe;font-weight:700;width=42%">Excavator State</td><td style="color:${d7State === 'IDLE' ? '#4CAF50' : d7State === 'OPERATING' ? '#FF9800' : d7State === 'LOADING' ? '#F44336' : '#9E9E9E'}">${d7State}</td></tr>
-                <tr><td style="color:#8fe;font-weight:700;width=42%">Total Path Points</td><td><b>${totalPathPoints24Hour}</b></td></tr>
                 <tr><td style="color:#8fe;font-weight:700;width=42%">Total Distance</td><td><b>${totalPathDistance24Hour.toFixed(3)} km</b></td></tr>
                 <tr><td style="color:#8fe;font-weight:700;width=42%">Flat Segments</td><td><b style="color:#4CAF50">${totalFlatSegments24Hour}</b> (${totalFlatDistance24Hour.toFixed(3)} km)</td></tr>
                 <tr><td style="color:#8fe;font-weight:700;width=42%">Gradient Segments</td><td><b style="color:#FF9800">${totalGradientSegments24Hour}</b> (${totalGradientDistance24Hour.toFixed(3)} km)</td></tr>
                 <tr><td style="color:#8fe;font-weight:700;width=42%">Avg Distance</td><td><b>${avgDistance24Hour.toFixed(3)} km</b></td></tr>
-                <tr><td style="color:#8fe;font-weight:700;width=42%">Auto-Update Status</td><td><b style="color:#4CAF50">ACTIVE</b></td></tr>
                 <tr><td style="color:#8fe;font-weight:700;width=42%">Last Update</td><td><b>${new Date().toLocaleTimeString()}</b></td></tr>
               </table>
             `;
@@ -4550,11 +4548,9 @@
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Vibration Level</td><td style="color:${vibration <= 2 ? '#4CAF50' : vibration <= 4 ? '#FF9800' : '#F44336'}"><b>${vibrationLabel} (${vibration})</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Detected State</td><td style="color:${excavatorState === 'IDLE' ? '#4CAF50' : excavatorState === 'OPERATING' ? '#FF9800' : excavatorState === 'LOADING' ? '#F44336' : '#9E9E9E'}"><b>${excavatorState}</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Roll</td><td><b>${H.roll ?? 'N/A'}°</b></td></tr>
-                    <tr><td style="color:#8fe;font-weight:700;width=42%">Path Points</td><td><b>${H.pathPoints24Hour}</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Total Distance</td><td><b style="color:#6ef08a">${H.pathDistance24Hour.toFixed(3)} km</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Flat Segments</td><td><b style="color:#4CAF50">${H.flatSegments24Hour || 0}</b> (${(H.flatDistance24Hour || 0).toFixed(3)} km)</td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Gradient Segments</td><td><b style="color:#FF9800">${H.gradientSegments24Hour || 0}</b> (${(H.gradientDistance24Hour || 0).toFixed(3)} km)</td></tr>
-                    <tr><td style="color:#8fe;font-weight:700;width=42%">Auto-Update</td><td><b style="color:#4CAF50">ACTIVE</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Last Update</td><td><b>${new Date().toLocaleTimeString()}</b></td></tr>
                   </table>
                 `;
@@ -4575,12 +4571,10 @@
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Gradient Angle</td><td><b>${H.pitchDisplay}</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Elevation</td><td><b style="color:${H.movementLabel === 'UPHILL' ? '#FF9800' : H.movementLabel === 'DOWNHILL' ? '#2196F3' : '#4CAF50'}">${H.movementLabel}</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Roll</td><td><b>${H.roll || 'N/A'}°</b></td></tr>
-                    <tr><td style="color:#8fe;font-weight:700;width=42%">Path Points</td><td><b>${H.pathPoints24Hour}</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Total Distance</td><td><b style="color:#6ef08a">${H.pathDistance24Hour.toFixed(3)} km</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Flat Segments</td><td><b style="color:#4CAF50">${H.flatSegments24Hour || 0}</b> (${(H.flatDistance24Hour || 0).toFixed(3)} km)</td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Gradient Segments</td><td><b style="color:#FF9800">${H.gradientSegments24Hour || 0}</b> (${(H.gradientDistance24Hour || 0).toFixed(3)} km)</td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Total Segments</td><td><b>${H.totalSegments24Hour || 0}</b></td></tr>
-                    <tr><td style="color:#8fe;font-weight:700;width=42%">Auto-Update</td><td><b style="color:#4CAF50">ACTIVE</b></td></tr>
                     <tr><td style="color:#8fe;font-weight:700;width=42%">Last Update</td><td><b>${new Date().toLocaleTimeString()}</b></td></tr>
                   </table>
                 `;
