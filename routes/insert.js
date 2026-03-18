@@ -692,6 +692,24 @@ const insertRealtimeData = (req, res) => {
     count1 !== undefined &&
     count1 !== null;
 
+  /* ========= TIMESTAMP CONVERSION FUNCTION ========= */
+  const getISTTimestamp = (ts) => {
+    let date;
+    if (ts) {
+      date = new Date(ts);
+    } else {
+      date = new Date();
+    }
+    
+    // Convert to IST by adding 5 hours 30 minutes
+    const istDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+    
+    // Format as MySQL datetime string
+    return istDate.toISOString().slice(0, 19).replace('T', ' ');
+  };
+
+  const formattedTimestamp = getISTTimestamp(timestamp);
+
   /* ================= DISTANCE FUNCTION ================= */
 
   const haversineKm = (p1, p2) => {
@@ -749,7 +767,7 @@ const insertRealtimeData = (req, res) => {
 
         const values = [
           device_id,
-          timestamp ? new Date(timestamp) : new Date(),
+          formattedTimestamp,  // CHANGED: Now using IST timestamp
           region_id,
           count1
         ];
@@ -761,7 +779,7 @@ const insertRealtimeData = (req, res) => {
             return res.status(500).json({ error: "insert error" });
           }
 
-          console.log(`✅ Count stored: ${count1}`);
+          console.log(`✅ Count stored: ${count1} at ${formattedTimestamp}`);
 
           return res.json({
             status: "success",
@@ -866,7 +884,7 @@ const insertRealtimeData = (req, res) => {
 
             device_id,
             equipment_name || null,
-            timestamp ? new Date(timestamp) : new Date(),
+            formattedTimestamp,  // CHANGED: Now using IST timestamp
             lat,
             lon,
             alt,
@@ -895,6 +913,7 @@ const insertRealtimeData = (req, res) => {
 
             console.log(`📍 Distance: ${(distance * 1000).toFixed(2)} m`);
             console.log(`⛽ Fuel: ${(fuelUsed * 1000).toFixed(2)} mL`);
+            console.log(`🕐 Stored at IST: ${formattedTimestamp}`);
 
             res.json({
               status: "success",
