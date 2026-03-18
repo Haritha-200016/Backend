@@ -4,6 +4,5 @@ module.exports = {
     user: "root",
     password: "vistaarnksh",
     database: "project",
-    timezone: '+05:30',
 }
 
