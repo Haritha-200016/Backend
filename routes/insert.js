@@ -3196,7 +3196,7 @@ const generateAnalysisReport = (req, res) => {
     // Call Python script
     const pythonPath = '/opt/sample/venv/bin/python'; // ✅ venv python
 
-    const pythonProcess = exec('${pythonPath} routes/analysis.py', (error, stdout, stderr) => {
+     const pythonProcess = exec(`${pythonPath} routes/analysis.py`, (error, stdout, stderr) => {
       if (error) {
         console.error('❌ Python error:', error);
         return originalJson.call(res, { error: "Analysis failed: " + error.message });
