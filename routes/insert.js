@@ -655,7 +655,6 @@ const insertRealtimeData = (req, res) => {
     fuel,
     pressure,
     count1,
-    timestamp,
     gps_status,
     z_axis
   } = req.body;
@@ -669,7 +668,7 @@ const insertRealtimeData = (req, res) => {
   const FUEL_PRICE_PER_LITER = 90;
   const SEA_LEVEL_RL = 525.5;
 
-  /* ========= SAFE NUMBER FUNCTION ========= */
+  /* ========= SAFE NUMBER ========= */
 
   const safeFloat = (v) => {
     const n = parseFloat(v);
@@ -678,7 +677,6 @@ const insertRealtimeData = (req, res) => {
 
   const lat = safeFloat(latitude);
   const lon = safeFloat(longitude);
-
   const alt = safeFloat(altitude);
   const spd = safeFloat(speed);
   const pit = safeFloat(pitch);
@@ -687,15 +685,11 @@ const insertRealtimeData = (req, res) => {
   const pres = safeFloat(pressure);
 
   const hasGPS = lat !== null && lon !== null;
+  const hasCount = count1 !== undefined && count1 !== null;
 
-  const hasCount =
-    count1 !== undefined &&
-    count1 !== null;
-
-  /* ================= DISTANCE FUNCTION ================= */
+  /* ================= DISTANCE ================= */
 
   const haversineKm = (p1, p2) => {
-
     const [lat1, lon1] = p1;
     const [lat2, lon2] = p2;
 
@@ -715,68 +709,47 @@ const insertRealtimeData = (req, res) => {
     return R * c;
   };
 
-  /* ================= GET REGION ================= */
+  /* ================= REGION ================= */
 
   pool.query(
     `SELECT region_id FROM devices WHERE device_id=?`,
     [device_id],
     (err, regionResult) => {
 
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: "region query error" });
-      }
-
-      if (regionResult.length === 0) {
+      if (err) return res.status(500).json({ error: err });
+      if (regionResult.length === 0)
         return res.status(404).json({ error: "device not found" });
-      }
 
       const region_id = regionResult[0].region_id;
 
-      /* ===================================================== */
-      /* ============ CASE 1 : ONLY COUNT DEVICE ============== */
-      /* ===================================================== */
+      /* ================= COUNT ONLY ================= */
 
       if (hasCount && !hasGPS) {
-
-        console.log("🔢 Dump counter device");
 
         const insertQuery = `
           INSERT INTO realtime_sensor_data
           (device_id, timestamp, region_id, count1)
-          VALUES (?, ?, ?, ?)
+          VALUES (?, NOW(), ?, ?)
         `;
 
         const values = [
           device_id,
-          timestamp ? new Date(timestamp) : new Date(),
           region_id,
           count1
         ];
 
-        pool.query(insertQuery, values, (err, result) => {
-
-          if (err) {
-            console.error(err);
-            return res.status(500).json({ error: "insert error" });
-          }
-
-          console.log(`✅ Count stored: ${count1}`);
+        return pool.query(insertQuery, values, (err, result) => {
+          if (err) return res.status(500).json({ error: err });
 
           return res.json({
             status: "success",
             message: "count stored",
             inserted_id: result.insertId
           });
-
         });
-
-        return;
       }
 
-      /* ===================================================== */
-      /* ================= GPS DEVICE ========================= */
-      /* ===================================================== */
+      /* ================= GPS DEVICE ================= */
 
       pool.query(
         `
@@ -824,7 +797,6 @@ const insertRealtimeData = (req, res) => {
           if (movementNumeric < -5) rate *= 0.7;
 
           fuelUsed = distance * rate;
-
           fuelCost = fuelUsed * FUEL_PRICE_PER_LITER;
 
           /* ================= RL ================= */
@@ -859,14 +831,12 @@ const insertRealtimeData = (req, res) => {
             z_axis,
             count1
           )
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          VALUES (?,?,NOW(),?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
           `;
 
           const values = [
-
             device_id,
             equipment_name || null,
-            timestamp ? new Date(timestamp) : new Date(),
             lat,
             lon,
             alt,
@@ -883,15 +853,12 @@ const insertRealtimeData = (req, res) => {
             region_id,
             gps_status || null,
             z_axis || null,
-            count1 !== undefined ? count1 : null
+            hasCount ? count1 : null
           ];
 
           pool.query(insertQuery, values, (err, result) => {
 
-            if (err) {
-              console.error(err);
-              return res.status(500).json({ error: "insert error" });
-            }
+            if (err) return res.status(500).json({ error: err });
 
             console.log(`📍 Distance: ${(distance * 1000).toFixed(2)} m`);
             console.log(`⛽ Fuel: ${(fuelUsed * 1000).toFixed(2)} mL`);
@@ -909,7 +876,6 @@ const insertRealtimeData = (req, res) => {
 
     }
   );
-
 };
 
 // 3. FETCH DASHBOARD DATA (Updated to include calculated fields)
