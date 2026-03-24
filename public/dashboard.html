@@ -1302,68 +1302,80 @@
       container.appendChild(buttonsContainer);
     }
 
-    async function downloadReport(reportType, shift = null) {
-      const region_id = regionMapping[region] || 5;
+async function downloadReport(reportType, shift = null) {
+  const region_id = regionMapping[region] || 5;
 
-      let message = `Generating ${reportType} report for ${region}...`;
-      if (reportType === 'shift') message = `Generating ${shift} shift report for ${region}...`;
+  let message = `Generating ${reportType} report for ${region}...`;
+  if (reportType === 'shift') message = `Generating ${shift} shift report for ${region}...`;
 
-      console.log(message);
-      showLoading(message);
+  console.log(message);
+  showLoading(message);
 
-      try {
-        let url;
-        if (reportType === 'shift') {
-          url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
-        } else if (reportType === 'daily') {
-          url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=daily&region_id=${region_id}`;
-        } else if (reportType === 'monthly') {
-          url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
-        }
-
-        console.log(`📡 Fetching from: ${url}`);
-        const response = await fetch(url);
-
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-        const contentType = response.headers.get('content-type');
-
-        if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json();
-          alert(`Analysis failed: ${errorData.error || 'Unknown error'}`);
-          return;
-        }
-
-        const blob = await response.blob();
-        const downloadUrl = URL.createObjectURL(blob);
-
-        const now = new Date();
-        const dateStr = now.toISOString().split('T')[0];
-        let filename = `Analysis_${region}_${reportType}`;
-        if (reportType === 'shift') filename += `_${shift}`;
-        filename += `_${dateStr}.xlsx`;
-
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(downloadUrl);
-        }, 100);
-
-        console.log(`✅ Analysis report downloaded: ${filename}`);
-
-      } catch (error) {
-        console.error('Error generating analysis:', error);
-        alert(`Failed to generate analysis: ${error.message}`);
-      } finally {
-        hideLoading();
-      }
+  try {
+    let url;
+    if (reportType === 'shift') {
+      url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
+    } else if (reportType === 'daily') {
+      url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=daily&region_id=${region_id}`;
+    } else if (reportType === 'monthly') {
+      url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
     }
 
+    console.log(`📡 Fetching from: ${url}`);
+    const response = await fetch(url);
+
+    console.log('Response status:', response.status);
+    console.log('Response headers:', [...response.headers.entries()]);
+    console.log('Content-Type:', response.headers.get('content-type'));
+
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+    const contentType = response.headers.get('content-type');
+    
+    // Force download regardless of content type if status is success
+    // But log what we got
+    console.log('Content-Type received:', contentType);
+    
+    const blob = await response.blob();
+    console.log('Blob size:', blob.size, 'bytes');
+    console.log('Blob type:', blob.type);
+    
+    if (blob.size === 0) {
+      console.error('Empty blob received!');
+      alert('Generated file is empty. Please check backend logs.');
+      return;
+    }
+    
+    const downloadUrl = URL.createObjectURL(blob);
+    
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    let filename = `Analysis_${region}_${reportType}`;
+    if (reportType === 'shift') filename += `_${shift}`;
+    filename += `_${dateStr}.xlsx`;
+    
+    console.log('Downloading file:', filename);
+    
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+    }, 100);
+    
+    console.log(`✅ Analysis report downloaded: ${filename}`);
+
+  } catch (error) {
+    console.error('Error generating analysis:', error);
+    alert(`Failed to generate analysis: ${error.message}`);
+  } finally {
+    hideLoading();
+  }
+}
     // Make functions globally available
     window.downloadReport = downloadReport;
     window.getDisplayName = getDisplayName;
