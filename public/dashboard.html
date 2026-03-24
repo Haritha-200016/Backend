@@ -1321,58 +1321,21 @@ async function downloadReport(reportType, shift = null) {
       url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
     }
 
-    console.log(`📡 Fetching from: ${url}`);
-    const response = await fetch(url);
-
-    console.log('Response status:', response.status);
-    console.log('Response headers:', [...response.headers.entries()]);
-    console.log('Content-Type:', response.headers.get('content-type'));
-
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-    const contentType = response.headers.get('content-type');
+    console.log(`📡 Opening URL: ${url}`);
     
-    // Force download regardless of content type if status is success
-    // But log what we got
-    console.log('Content-Type received:', contentType);
+    // Open in new tab - browser handles download automatically
+    window.open(url, '_blank');
     
-    const blob = await response.blob();
-    console.log('Blob size:', blob.size, 'bytes');
-    console.log('Blob type:', blob.type);
+    console.log(`✅ Report request sent`);
     
-    if (blob.size === 0) {
-      console.error('Empty blob received!');
-      alert('Generated file is empty. Please check backend logs.');
-      return;
-    }
-    
-    const downloadUrl = URL.createObjectURL(blob);
-    
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];
-    let filename = `Analysis_${region}_${reportType}`;
-    if (reportType === 'shift') filename += `_${shift}`;
-    filename += `_${dateStr}.xlsx`;
-    
-    console.log('Downloading file:', filename);
-    
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    
+    // Hide loading after a short delay
     setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(downloadUrl);
-    }, 100);
-    
-    console.log(`✅ Analysis report downloaded: ${filename}`);
+      hideLoading();
+    }, 1000);
 
   } catch (error) {
     console.error('Error generating analysis:', error);
     alert(`Failed to generate analysis: ${error.message}`);
-  } finally {
     hideLoading();
   }
 }
@@ -3502,7 +3465,7 @@ async function renderAllHaulersFuelChart(forceRefresh = false) {
     }
 
 
-
+    
     async function renderAllHaulersFuelVsSpeed(forceRefresh = false) {
       try {
         const chartContainer = document.getElementById('fuelVsSpeedContainer');
