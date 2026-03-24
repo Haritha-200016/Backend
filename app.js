@@ -17,7 +17,7 @@ app.use(express.json({ limit: "200mb" }));
 app.use(express.urlencoded({ extended: true, limit: "200mb" }));
 
 
-const PORT = 5003;
+const PORT = 5001;
 
 // Company/region APIs
 app.get('/getcompanies', fetch.getcompanies);
@@ -25,7 +25,7 @@ app.get('/sectors', fetch.getsectors);
 app.get('/getregions', fetch.getregions);
 
 // Dashboard APIs
-app.get('/fetch-dashboard-data', insert.fetchDashboardData);
+//app.get('/fetch-dashboard-data', insert.fetchDashboardData);
 app.get('/api/get_last_10_zaxis', insert.getLast10ZAxis);
 app.post('/insert-realtime-data', insert.insertRealtimeData);
 
