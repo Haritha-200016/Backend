@@ -1490,16 +1490,24 @@ const generateAnalysisReport = (req, res) => {
 
   if (isAllDevices) {
     // Use the "ALL" versions of your functions
-    if (timeRange === 'shift' && shift) {
-      let shiftParam = '';
-      if (shift === '6am-2pm') shiftParam = 'morning';
-      else if (shift === '2pm-10pm') shiftParam = 'afternoon';
-      else if (shift === '10pm-6am') shiftParam = 'night';
+if (timeRange === 'shift' && shift) {
+  let shiftParam = '';
+  if (shift === '6am-2pm') shiftParam = 'morning';
+  else if (shift === '2pm-10pm') shiftParam = 'afternoon';
+  else if (shift === '10pm-6am') shiftParam = 'night';
+  else shiftParam = shift;
 
-      req.query.shift = shiftParam;
-      if (region_id) req.query.region_id = region_id;
-      dataFetcher = getAllDevicesShiftData;
+  const newReq = {
+    ...req,
+    query: {
+      ...req.query,
+      shift: shiftParam,
+      region_id: region_id
     }
+  };
+
+  dataFetcher = (req2, res2) => getAllDevicesShiftData(newReq, res2);
+}
     else if (timeRange === 'daily') {
       if (region_id) req.query.region_id = region_id;
       dataFetcher = getAllDevicesDailyData;
