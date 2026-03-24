@@ -1286,7 +1286,7 @@ const fetchDashboardDataby = (req, res) => {
 
 
 // ==================== ANALYSIS ENDPOINT ====================
-const generateAnalysisReport = (req, res) => {
+/*const generateAnalysisReport = (req, res) => {
   const {
     device_id,
     timeRange,
@@ -1401,9 +1401,181 @@ const generateAnalysisReport = (req, res) => {
     console.log(`🚀 Sending ${records.length} records to Python for analysis...`);
 
     // Call Python script
-      const pythonPath = '/opt/sample/venv/bin/python'; // ✅ venv python
-      const pythonProcess = exec(`${pythonPath} routes/analysis.py`, (error, stdout, stderr) => {
-    //const pythonProcess = exec('python routes/analysis.py', (error, stdout, stderr) => {
+     // const pythonPath = '/opt/sample/venv/bin/python'; // ✅ venv python
+     //const pythonProcess = exec(`${pythonPath} routes/analysis.py`, (error, stdout, stderr) => {
+     const pythonProcess = exec('python routes/analysis.py', (error, stdout, stderr) => {
+      if (error) {
+        console.error('❌ Python error:', error);
+        return originalJson.call(res, { error: "Analysis failed: " + error.message });
+      }
+
+      if (stderr) {
+        console.log('📝 Python log:', stderr);
+      }
+
+      try {
+        const result = JSON.parse(stdout);
+
+        // Check the status from Python
+        if (result.status === 'error') {
+          console.error('❌ Python analysis error:', result.error);
+          return originalJson.call(res, { error: result.error });
+        }
+
+        // Your analysis.py returns 'report' field with base64 Excel data
+        if (!result.report) {
+          console.error('❌ No report data in Python output');
+          console.log('Python output keys:', Object.keys(result));
+          return originalJson.call(res, { error: "No report data generated" });
+        }
+
+        // Decode the base64 Excel file
+        const excelBuffer = Buffer.from(result.report, 'base64');
+
+        // Use filename from Python
+        const filename = result.filename || `analysis_${device_id}_${timeRange}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+        // Set correct headers for Excel file download
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', excelBuffer.length);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+
+        // Send the Excel file
+        res.send(excelBuffer);
+
+        console.log(`✅ Analysis complete! Excel report sent: ${filename}`);
+        console.log(`📊 Report size: ${(excelBuffer.length / 1024).toFixed(2)} KB`);
+
+      } catch (e) {
+        console.error('❌ Failed to parse Python output:', e);
+        console.log('Raw output (first 500 chars):', stdout.substring(0, 500));
+        originalJson.call(res, { error: "Failed to generate report - invalid response from analysis engine" });
+      }
+    });
+
+    pythonProcess.stdin.write(JSON.stringify(pythonInput));
+    pythonProcess.stdin.end();
+  };
+
+  // Call the appropriate data fetcher
+  dataFetcher(req, res);
+};*/
+
+
+
+const generateAnalysisReport = (req, res) => {
+  const {
+    device_id,
+    timeRange,
+    shift,
+    region_id
+  } = req.query;
+
+  if (!device_id || !timeRange) {
+    return res.status(400).json({
+      error: "device_id and timeRange required"
+    });
+  }
+
+  console.log(`📊 Generating analysis for ${device_id} - ${timeRange} ${shift || ''} (Region: ${region_id || 'ALL'})`);
+
+  // Check if we need ALL devices or a specific one
+  const isAllDevices = device_id === 'all';
+
+  // Choose the right data fetcher based on timeRange and device selection
+  let dataFetcher;
+
+  if (isAllDevices) {
+    // Use the "ALL" versions of your functions
+    if (timeRange === 'shift' && shift) {
+      let shiftParam = '';
+      if (shift === '6am-2pm') shiftParam = 'morning';
+      else if (shift === '2pm-10pm') shiftParam = 'afternoon';
+      else if (shift === '10pm-6am') shiftParam = 'night';
+
+      req.query.shift = shiftParam;
+      if (region_id) req.query.region_id = region_id;
+      dataFetcher = getAllDevicesShiftData;
+    }
+    else if (timeRange === 'daily') {
+      if (region_id) req.query.region_id = region_id;
+      dataFetcher = getAllDevicesDailyData;
+    }
+    else if (timeRange === 'monthly') {
+      if (region_id) req.query.region_id = region_id;
+      dataFetcher = getAllDevicesMonthlyData;
+    }
+    else {
+      return res.status(400).json({ error: "Invalid timeRange" });
+    }
+  } else {
+    // Use single device versions
+    if (timeRange === 'shift' && shift) {
+      let shiftParam = '';
+      if (shift === '6am-2pm') shiftParam = 'morning';
+      else if (shift === '2pm-10pm') shiftParam = 'afternoon';
+      else if (shift === '10pm-6am') shiftParam = 'night';
+
+      req.query.shift = shiftParam;
+      if (region_id) req.query.region_id = region_id;
+      dataFetcher = getDeviceShiftData;
+    }
+    else if (timeRange === 'daily') {
+      if (region_id) req.query.region_id = region_id;
+      dataFetcher = getDeviceDailyData;
+    }
+    else if (timeRange === 'monthly') {
+      if (region_id) req.query.region_id = region_id;
+      dataFetcher = getDeviceMonthlyData;
+    }
+    else {
+      return res.status(400).json({ error: "Invalid timeRange" });
+    }
+  }
+
+  // Store the original res.json
+  const originalJson = res.json;
+
+  // Override res.json to capture the data
+  res.json = function(data) {
+    // Check if we have data in any format
+    let records = [];
+
+    // Handle different response formats
+    if (data && data.data && Array.isArray(data.data)) {
+      records = data.data;
+    } else if (data && Array.isArray(data)) {
+      records = data;
+    } else if (data && data.results && Array.isArray(data.results)) {
+      records = data.results;
+    }
+
+    console.log(`📊 Found ${records.length} records for analysis`);
+
+    // Format data for Python
+    const pythonInput = {
+      data: records.map(row => ({
+        device_id: row.device_id || device_id,
+        time: row.timestamp,
+        lat: parseFloat(row.latitude || 0),
+        lon: parseFloat(row.longitude || 0),
+        pitch: parseFloat(row.pitch || 0),
+        fuel: parseFloat(row.fuel || 0),
+        speed: parseFloat(row.speed || 0),
+        distance: parseFloat(row.distance || 0),
+        fuel_cost: parseFloat(row.fuel_cost || 0)
+      }))
+    };
+
+    console.log(`🚀 Sending ${records.length} records to Python for analysis...`);
+
+    // Call Python script
+    const pythonPath = '/opt/sample/venv/bin/python'; // ✅ venv python
+
+     const pythonProcess = exec(`${pythonPath} routes/analysis.py`, (error, stdout, stderr) => {
       if (error) {
         console.error('❌ Python error:', error);
         return originalJson.call(res, { error: "Analysis failed: " + error.message });
