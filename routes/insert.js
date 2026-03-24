@@ -835,7 +835,7 @@ const getDeviceShiftData = (req, res) => {
 };
 
 // Get shift data for ALL devices in a region
-const getAllDevicesShiftData = (req, res) => {
+/*const getAllDevicesShiftData = (req, res) => {
   const { shift, region_id } = req.query;
 
   if (!shift || !region_id) {
@@ -907,8 +907,102 @@ const getAllDevicesShiftData = (req, res) => {
       data: filteredResults
     });
   });
-};
+};*/
 
+const getAllDevicesShiftData = (req, res) => {
+  // DEBUG: Log everything
+  console.log('========================================');
+  console.log('getAllDevicesShiftData called at:', new Date().toISOString());
+  console.log('Full req.query:', JSON.stringify(req.query, null, 2));
+  console.log('shift value:', req.query.shift);
+  console.log('region_id value:', req.query.region_id);
+  console.log('========================================');
+  
+  const { shift, region_id } = req.query;
+
+  if (!shift || !region_id) {
+    console.log('❌ Missing parameters!');
+    return res.status(400).json({ error: "shift and region_id required" });
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  
+  console.log('📅 Calculated today:', today);
+  console.log('📅 Calculated tomorrow:', tomorrow);
+
+  const shifts = {
+    'morning': { start: '06:00:00', end: '14:00:00' },
+    'afternoon': { start: '14:00:00', end: '22:00:00' },
+    'night': { start: '22:00:00', end: '06:00:00' }
+  };
+
+  if (!shifts[shift]) {
+    console.log('❌ Invalid shift:', shift);
+    return res.status(400).json({ error: "Invalid shift" });
+  }
+
+  let query;
+  let params;
+
+  if (shift === 'night') {
+    query = `
+      SELECT * FROM realtime_sensor_data 
+      WHERE region_id = ?
+      AND (
+        (DATE(timestamp) = ? AND TIME(timestamp) >= '22:00:00')
+        OR
+        (DATE(timestamp) = ? AND TIME(timestamp) < '06:00:00')
+      )
+      ORDER BY device_id, timestamp ASC
+    `;
+    params = [region_id, today, tomorrow];
+  } else {
+    query = `
+      SELECT * FROM realtime_sensor_data 
+      WHERE region_id = ?
+      AND DATE(timestamp) = ?
+      AND TIME(timestamp) BETWEEN ? AND ?
+      ORDER BY device_id, timestamp ASC
+    `;
+    params = [region_id, today, shifts[shift].start, shifts[shift].end];
+  }
+
+  console.log('🔍 SQL Query:', query);
+  console.log('🔍 Params:', params);
+
+  db.query(query, params, (err, results) => {
+    if (err) {
+      console.error("Error:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+
+    console.log(`✅ Found ${results.length} records for ${shift} shift`);
+    
+    if (results.length > 0) {
+      console.log('📝 First record timestamp:', results[0].timestamp);
+    }
+
+    const filteredResults = results.map(row => {
+      const filteredRow = {};
+      Object.keys(row).forEach(key => {
+        if (row[key] !== null && row[key] !== undefined) {
+          filteredRow[key] = row[key];
+        }
+      });
+      return filteredRow;
+    });
+
+    res.json({
+      status: "success",
+      region_id,
+      shift,
+      date: today,
+      total_records: filteredResults.length,
+      data: filteredResults
+    });
+  });
+};
 // ==================== DAILY (24hr - full day) ====================
 
 const getDeviceDailyData = (req, res) => {
@@ -1491,12 +1585,18 @@ const generateAnalysisReport = (req, res) => {
   if (isAllDevices) {
     // Use the "ALL" versions of your functions
 if (timeRange === 'shift' && shift) {
+  console.log('🔄 WRAPPER DEBUG:');
+  console.log('  Original shift from query:', shift);
+  console.log('  Original region_id:', region_id);
+  
   let shiftParam = '';
   if (shift === '6am-2pm') shiftParam = 'morning';
   else if (shift === '2pm-10pm') shiftParam = 'afternoon';
   else if (shift === '10pm-6am') shiftParam = 'night';
   else shiftParam = shift;
-
+  
+  console.log('  Mapped shiftParam:', shiftParam);
+  
   const newReq = {
     ...req,
     query: {
@@ -1505,8 +1605,13 @@ if (timeRange === 'shift' && shift) {
       region_id: region_id
     }
   };
-
-  dataFetcher = (req2, res2) => getAllDevicesShiftData(newReq, res2);
+  
+  console.log('  newReq.query:', newReq.query);
+  
+  dataFetcher = (req2, res2) => {
+    console.log('📞 Calling getAllDevicesShiftData with:', req2.query);
+    getAllDevicesShiftData(req2, res2);
+  };
 }
     else if (timeRange === 'daily') {
       if (region_id) req.query.region_id = region_id;
