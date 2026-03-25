@@ -916,69 +916,6 @@
       'default': ['daily', 'monthly']
     };
 
-    // Universal download function that works on all devices including mobile
-async function downloadFile(blob, filename) {
-  return new Promise((resolve, reject) => {
-    try {
-      // Check if the file is an Excel file
-      const isExcel = filename.endsWith('.xlsx') || filename.endsWith('.xls');
-      
-      // For iOS, use a different approach
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-      
-      if (isIOS && isExcel) {
-        // iOS specific approach
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          try {
-            // Create a temporary link
-            const link = document.createElement('a');
-            link.href = e.target.result;
-            link.download = filename;
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            
-            // Trigger download
-            link.click();
-            
-            // Cleanup
-            setTimeout(() => {
-              document.body.removeChild(link);
-              URL.revokeObjectURL(e.target.result);
-              resolve();
-            }, 100);
-          } catch (err) {
-            reject(err);
-          }
-        };
-        reader.onerror = function() {
-          reject(new Error('Failed to read blob'));
-        };
-        reader.readAsDataURL(blob);
-      } else {
-        // Standard approach for Android and desktop
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        link.style.display = 'none';
-        
-        document.body.appendChild(link);
-        link.click();
-        
-        // Cleanup
-        setTimeout(() => {
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-          resolve();
-        }, 150);
-      }
-    } catch (error) {
-      console.error('Download error:', error);
-      reject(error);
-    }
-  });
-}
     let cachedData = null;
     let pathHistory = {};
 
@@ -1734,7 +1671,7 @@ async function downloadFile(blob, filename) {
       }
 
       // ==================== DUMP PANEL ====================
-// ==================== DUMP PANEL - COMPLETE WORKING SOLUTION ====================
+// ==================== SIMPLE WORKING DUMP PANEL ====================
 if (panelId === 'Dump') {
   grid.innerHTML = '';
 
@@ -1807,15 +1744,11 @@ if (panelId === 'Dump') {
       const res = await fetch(url);
       const json = await res.json();
 
-      console.log("🔥 Dump API:", json);
-
       if (json.status !== 'success' || !json.devices || json.devices.length === 0) {
-        console.warn("No devices");
         return;
       }
 
       const device = json.devices[0];
-
       document.getElementById('dumpCount').innerText = device.count1 ?? 0;
       document.getElementById('dumpTime').innerText = new Date(device.timestamp).toLocaleString();
 
@@ -1824,254 +1757,87 @@ if (panelId === 'Dump') {
     }
   }
 
-  // ========== METHOD 1: DIRECT DOWNLOAD (Works on Android) ==========
-  async function directDownload(blob, filename) {
-    return new Promise((resolve, reject) => {
-      try {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        
-        setTimeout(() => {
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-          resolve(true);
-        }, 1000);
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
-  // ========== METHOD 2: WEB SHARE API (Works on modern mobile) ==========
-  async function shareDownload(blob, filename) {
-    try {
-      // Check if Web Share API is supported
-      if (navigator.share && blob.size < 10000000) { // 10MB limit
-        const file = new File([blob], filename, { type: blob.type });
-        await navigator.share({
-          title: 'Download Mining Report',
-          text: `${filename} is ready to download`,
-          files: [file]
-        });
-        return true;
-      }
-      return false;
-    } catch (err) {
-      console.log('Share failed:', err);
-      return false;
-    }
-  }
-
-  // ========== METHOD 3: SAVE AS BLOB (iOS Fallback) ==========
-  async function iosDownload(blob, filename) {
-    return new Promise((resolve, reject) => {
-      try {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          // Create a temporary link with data URL
-          const link = document.createElement('a');
-          link.href = e.target.result;
-          link.download = filename;
-          link.style.display = 'none';
-          document.body.appendChild(link);
-          link.click();
-          
-          setTimeout(() => {
-            document.body.removeChild(link);
-            resolve(true);
-          }, 1000);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
-  // ========== METHOD 4: OPEN IN NEW WINDOW (Universal Fallback) ==========
-  async function openInNewWindow(blob, filename) {
-    return new Promise((resolve, reject) => {
-      try {
-        const url = URL.createObjectURL(blob);
-        const newWindow = window.open(url, '_blank');
-        
-        if (newWindow) {
-          newWindow.focus();
-          // Close the window after a delay
-          setTimeout(() => {
-            URL.revokeObjectURL(url);
-            resolve(true);
-          }, 5000);
-        } else {
-          reject(new Error('Popup blocked'));
-        }
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
-  // ========== METHOD 5: COPY TO CLIPBOARD (Last Resort) ==========
-  async function copyToClipboard(blob, filename) {
-    try {
-      const text = `Download file: ${filename}\nSize: ${(blob.size / 1024).toFixed(2)} KB\nPlease enable downloads in your browser settings.`;
-      await navigator.clipboard.writeText(text);
-      alert(`Information copied to clipboard. Please enable downloads in your browser to save ${filename}`);
-      return true;
-    } catch (err) {
-      return false;
-    }
-  }
-
-  // ========== MAIN DOWNLOAD FUNCTION WITH MULTIPLE FALLBACKS ==========
+  // ========== SIMPLE DOWNLOAD THAT WORKS ON MOBILE ==========
   async function downloadDumpReport(range = 'daily') {
     try {
-      showLoading(`Preparing ${range} report...`);
+      showLoading(`Getting ${range} data...`);
       
       const url = range === 'daily'
         ? `${BASE_URL}/getAllDevices-DailyData?device_id=all&timeRange=daily&region_id=10`
         : `${BASE_URL}/getAll-Devices-MonthlyData?device_id=all&timeRange=monthly&region_id=10`;
 
-      console.log('📡 Fetching from:', url);
+      console.log('Fetching:', url);
       
       const response = await fetch(url);
+      const jsonData = await response.json();
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const contentType = response.headers.get('content-type');
-      let blob;
-      const now = new Date();
-      const dateStr = now.toISOString().split('T')[0];
-      let filename = `Dump_${range}_${dateStr}.xlsx`;
-
-      if (contentType && contentType.includes('application/json')) {
-        const jsonData = await response.json();
-        console.log('JSON Response:', jsonData);
-        
-        if (!jsonData.data || jsonData.data.length === 0) {
-          alert(`No ${range} data available for download`);
-          hideLoading();
-          return;
-        }
-        
-        // Create Excel file from JSON data
-        const wsData = [['Device ID', 'Count1', 'Timestamp']];
-        
-        jsonData.data.forEach(item => {
-          wsData.push([
-            item.device_id || 'N/A',
-            item.count1 || 0,
-            item.timestamp || new Date().toISOString()
-          ]);
-        });
-        
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Dump Data');
-        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        
-        blob = new Blob([excelBuffer], { 
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-        });
-        
-        console.log('Excel file created, size:', (blob.size / 1024).toFixed(2), 'KB');
-        
-      } else {
-        blob = await response.blob();
-        console.log('Direct file received, size:', (blob.size / 1024).toFixed(2), 'KB');
-        
-        if (blob.size === 0) {
-          throw new Error('Received empty file from server');
-        }
-      }
-
-      // Try multiple download methods in sequence
-      let downloadSuccess = false;
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      
-      // For iOS, try iOS method first
-      if (isIOS) {
-        try {
-          console.log('Trying iOS download method...');
-          await iosDownload(blob, filename);
-          downloadSuccess = true;
-        } catch (err) {
-          console.log('iOS method failed:', err);
-        }
+      if (!jsonData.data || jsonData.data.length === 0) {
+        alert(`No ${range} data available`);
+        hideLoading();
+        return;
       }
       
-      // Try direct download (Android/Desktop)
-      if (!downloadSuccess) {
-        try {
-          console.log('Trying direct download...');
-          await directDownload(blob, filename);
-          downloadSuccess = true;
-        } catch (err) {
-          console.log('Direct download failed:', err);
-        }
-      }
+      // Create Excel file
+      const wsData = [['Device ID', 'Count1', 'Timestamp']];
+      jsonData.data.forEach(item => {
+        wsData.push([
+          item.device_id || 'N/A',
+          item.count1 || 0,
+          item.timestamp || new Date().toISOString()
+        ]);
+      });
       
-      // Try open in new window
-      if (!downloadSuccess) {
-        try {
-          console.log('Trying open in new window...');
-          await openInNewWindow(blob, filename);
-          downloadSuccess = true;
-        } catch (err) {
-          console.log('Open in new window failed:', err);
-        }
-      }
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Dump Data');
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       
-      // Try Web Share API
-      if (!downloadSuccess) {
-        try {
-          console.log('Trying Web Share API...');
-          const shared = await shareDownload(blob, filename);
-          if (shared) downloadSuccess = true;
-        } catch (err) {
-          console.log('Share failed:', err);
-        }
-      }
+      const filename = `Dump_${range}_${new Date().toISOString().split('T')[0]}.xlsx`;
       
-      // Last resort: Copy to clipboard with instructions
-      if (!downloadSuccess) {
-        await copyToClipboard(blob, filename);
-      }
+      // ========== THIS IS THE IMPORTANT PART ==========
+      // Create download link
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      link.style.display = 'none';
+      
+      // Add to page, click, remove
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+      }, 100);
       
       // Show success message
-      const successMsg = document.createElement('div');
-      if (downloadSuccess) {
-        successMsg.innerHTML = `
-          <div style="position: fixed; bottom: 20px; left: 20px; right: 20px; background: #4CAF50; color: white; padding: 15px; border-radius: 8px; text-align: center; z-index: 10000; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-            ✅ ${range.toUpperCase()} Report Ready!<br>
-            <small style="font-size: 12px;">Check your Downloads folder or Files app</small>
-          </div>
-        `;
-      } else {
-        successMsg.innerHTML = `
-          <div style="position: fixed; bottom: 20px; left: 20px; right: 20px; background: #FF9800; color: white; padding: 15px; border-radius: 8px; text-align: center; z-index: 10000; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-            ⚠️ Download instructions copied to clipboard<br>
-            <small style="font-size: 12px;">Please enable downloads in your browser settings</small>
-          </div>
-        `;
-      }
-      document.body.appendChild(successMsg);
-      setTimeout(() => successMsg.remove(), 5000);
+      const msg = document.createElement('div');
+      msg.textContent = `✅ ${range.toUpperCase()} report created!`;
+      msg.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        background: #4CAF50;
+        color: white;
+        padding: 12px;
+        border-radius: 8px;
+        text-align: center;
+        z-index: 10000;
+        font-weight: bold;
+      `;
+      document.body.appendChild(msg);
+      setTimeout(() => msg.remove(), 3000);
       
-      console.log(`✅ ${range.toUpperCase()} report processed`);
+      console.log('✅ File created:', filename);
       hideLoading();
       
     } catch (error) {
-      console.error('Error downloading dump report:', error);
-      alert(`Failed to download: ${error.message}`);
+      console.error('Error:', error);
+      alert(`Failed: ${error.message}`);
       hideLoading();
     }
   }
@@ -2085,12 +1851,10 @@ if (panelId === 'Dump') {
     await downloadDumpReport('monthly');
   };
 
-  // Start fetching dump value
   fetchDumpValue();
   setInterval(fetchDumpValue, 30000);
 }
-
-// ==================== DRONE STREAM PANEL ====================
+      // ==================== DRONE STREAM PANEL ====================
       if (panelId === 'DroneStream') {
         container.innerHTML = `
           <header>
@@ -3929,7 +3693,7 @@ async function renderAllHaulersFuelChart(forceRefresh = false) {
     window.renderFuelGradientForHauler = renderFuelGradientForHauler;
     window.renderAllHaulersFuelChart = renderAllHaulersFuelChart;
     window.renderFuelVsSpeedForHauler = renderFuelVsSpeedForHauler;
-    window.renderAllHaulersFuelVsSpeed = renderAllHaulersFuelVsSpeed;
+    window.renderAllHaulersFuelVsSpeed = renderrenderAllHaulersFuelVsSpeed;
 
     // ==================== DYNAMIC MAP SIMULATION FOR BOTH REGIONS ====================
     async function initializeDynamicMapSimulation() {
