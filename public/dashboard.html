@@ -1303,41 +1303,56 @@
     }
 
 async function downloadReport(reportType, shift = null) {
-  const region_id = regionMapping[region] || 5;
+    const region_id = regionMapping[region] || 5;
 
-  let message = `Generating ${reportType} report for ${region}...`;
-  if (reportType === 'shift') message = `Generating ${shift} shift report for ${region}...`;
+    let message = `Generating ${reportType} report for ${region}...`;
+    if (reportType === 'shift') message = `Generating ${shift} shift report for ${region}...`;
+    
+    console.log(message);
+    showLoading(message);
 
-  console.log(message);
-  showLoading(message);
+    try {
+        // Build URL (same as before)
+        let url;
+        if (reportType === 'shift') {
+            url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
+        } else if (reportType === 'daily') {
+            url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=daily&region_id=${region_id}`;
+        } else if (reportType === 'monthly') {
+            url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
+        }
 
-  try {
-    let url;
-    if (reportType === 'shift') {
-      url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
-    } else if (reportType === 'daily') {
-      url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=daily&region_id=${region_id}`;
-    } else if (reportType === 'monthly') {
-      url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
+        // Fetch the file from server
+        const response = await fetch(url);
+        const blob = await response.blob();
+        
+        // Create filename
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        let filename = `Analysis_${region}_${reportType}`;
+        if (reportType === 'shift') filename += `_${shift}`;
+        filename += `_${dateStr}.xlsx`;
+        
+        // Create download link
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        
+        // Clean up
+        setTimeout(() => {
+            document.body.removeChild(link);
+            URL.revokeObjectURL(downloadUrl);
+            hideLoading();
+        }, 100);
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Download failed: ' + error.message);
+        hideLoading();
     }
-
-    console.log(`📡 Opening URL: ${url}`);
-    
-    // Open in new tab - browser handles download automatically
-    window.open(url, '_blank');
-    
-    console.log(`✅ Report request sent`);
-    
-    // Hide loading after a short delay
-    setTimeout(() => {
-      hideLoading();
-    }, 1000);
-
-  } catch (error) {
-    console.error('Error generating analysis:', error);
-    alert(`Failed to generate analysis: ${error.message}`);
-    hideLoading();
-  }
 }
     // Make functions globally available
     window.downloadReport = downloadReport;
@@ -3144,6 +3159,8 @@ async function renderFuelGradientForHauler(haulerId, forceRefresh = false) {
 }
 
 
+
+
 async function renderAllHaulersFuelChart(forceRefresh = false) {
   try {
     const chartContainer = document.getElementById('fuelChartContainer');
@@ -3276,6 +3293,10 @@ async function renderAllHaulersFuelChart(forceRefresh = false) {
     }
   }
 }
+    
+
+
+
     async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
       try {
         const chartContainer = document.getElementById('fuelVsSpeedContainer');
