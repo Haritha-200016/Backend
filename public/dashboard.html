@@ -10,7 +10,6 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 
   <style>
     /* Your existing styles remain exactly the same */
@@ -1311,14 +1310,7 @@ async function downloadReport(reportType, shift = null) {
     
     showLoading(message);
 
-    if (window.isDownloading) {
-        return;
-    }
-
     try {
-        window.isDownloading = true;
-
-        // Build URL
         let url;
         if (reportType === 'shift') {
             url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
@@ -1328,92 +1320,22 @@ async function downloadReport(reportType, shift = null) {
             url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
         }
 
-        // Fetch the Excel file
-        const response = await fetch(url);
-        const blob = await response.blob();
+        // Open in new tab - this works on all devices
+        window.open(url, '_blank');
         
-        // Create filename
-        const now = new Date();
-        const dateStr = now.toISOString().split('T')[0];
-        let filename = `Analysis_${region}_${reportType}`;
-        if (reportType === 'shift') filename += `_${shift}`;
-        filename += `_${dateStr}.xlsx`;
+        // Hide loading after 2 seconds
+        setTimeout(() => hideLoading(), 2000);
         
-        // Universal download function
-        downloadFile(blob, filename);
-        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Download failed: ' + error.message);
         hideLoading();
-        window.isDownloading = false;
-        
-    } catch (err) {
-        console.error('Download error:', err);
-        alert('Failed to download: ' + err.message);
-        hideLoading();
-        window.isDownloading = false;
     }
 }
-
-// ==================== ADD THIS FUNCTION HERE ====================
-function downloadFile(blob, filename) {
-    // iOS detection
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    
-    // Create blob URL
-    const blobUrl = URL.createObjectURL(blob);
-    
-    if (isIOS) {
-        // iOS: Show visible download link (THIS WORKS!)
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = filename;
-        link.innerHTML = `📥 Tap to Download ${filename}`;
-        link.style.cssText = `
-            display: block;
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            right: 20px;
-            background: #4CAF50;
-            color: white;
-            text-align: center;
-            padding: 15px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-size: 16px;
-            font-weight: bold;
-            z-index: 9999;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            font-family: system-ui, -apple-system, sans-serif;
-        `;
-        document.body.appendChild(link);
-        
-        // Auto remove after 1 minute
-        setTimeout(() => {
-            if (document.body.contains(link)) {
-                document.body.removeChild(link);
-                URL.revokeObjectURL(blobUrl);
-            }
-        }, 60000);
-        
-    } else {
-        // Android & Desktop: Auto download
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        
-        setTimeout(() => {
-            document.body.removeChild(a);
-            URL.revokeObjectURL(blobUrl);
-        }, 100);
-    }
-}
-// ==================== END OF ADDED FUNCTION ====================
-
-window.downloadReport = downloadReport;
-window.getDisplayName = getDisplayName;
-window.getDeviceIdFromDisplayName = getDeviceIdFromDisplayName;
+    // Make functions globally available
+    window.downloadReport = downloadReport;
+    window.getDisplayName = getDisplayName;
+    window.getDeviceIdFromDisplayName = getDeviceIdFromDisplayName;
 
     // ==================== RENDER DASHBOARD ====================
     async function renderDashboard(panelId) {
@@ -1810,29 +1732,19 @@ window.getDeviceIdFromDisplayName = getDeviceIdFromDisplayName;
 
         // 🔹 Download (unchanged)
 async function downloadDumpReport(range = 'daily') {
-    // Show loading
     showLoading(`Generating ${range} dump report...`);
     
-    if (window.isDownloading) {
-        return;
-    }
-    
     try {
-        window.isDownloading = true;
-        
         const url = range === 'daily'
             ? `${BASE_URL}/getAllDevices-DailyData?device_id=all&timeRange=daily&region_id=10`
             : `${BASE_URL}/getAll-Devices-MonthlyData?device_id=all&timeRange=monthly&region_id=10`;
 
-        console.log('Fetching dump data from:', url);
-        
         const res = await fetch(url);
         const data = await res.json();
 
         if (!data.data || data.data.length === 0) {
             alert('No data available');
             hideLoading();
-            window.isDownloading = false;
             return;
         }
 
@@ -1842,38 +1754,38 @@ async function downloadDumpReport(range = 'daily') {
             wsData.push([d.device_id || '', d.count1 || '', d.timestamp || '']);
         });
 
-        // Create Excel using XLSX
         const ws = XLSX.utils.aoa_to_sheet(wsData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Dump Report');
         
-        // Create filename
         const now = new Date();
         const dateStr = now.toISOString().split('T')[0];
         const filename = `Dump_Report_${range}_${dateStr}.xlsx`;
         
-        // Generate Excel buffer
-        const wbBuffer = XLSX.write(wb, {
-            bookType: 'xlsx',
-            type: 'array'
-        });
+        // Write file - this triggers download on desktop
+        XLSX.writeFile(wb, filename);
         
-        // Create blob
-        const blob = new Blob([wbBuffer], {
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        });
-        
-        // Download using universal function
-        downloadFile(blob, filename);
+        // For mobile, show a link
+        if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            setTimeout(() => {
+                const blobData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                const blobUrl = URL.createObjectURL(new Blob([blobData], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = filename;
+                link.innerHTML = `📥 Tap to Download ${filename}`;
+                link.style.cssText = 'display:block;position:fixed;bottom:20px;left:20px;right:20px;background:#4CAF50;color:white;text-align:center;padding:15px;border-radius:8px;z-index:9999;';
+                document.body.appendChild(link);
+                setTimeout(() => { if(link) link.remove(); }, 30000);
+            }, 500);
+        }
         
         hideLoading();
-        window.isDownloading = false;
         
     } catch (err) {
         console.error('Download error:', err);
         alert('Failed to download: ' + err.message);
         hideLoading();
-        window.isDownloading = false;
     }
 }
         dailyBtn.onclick = () => downloadDumpReport('daily');
@@ -3262,7 +3174,6 @@ async function renderFuelGradientForHauler(haulerId, forceRefresh = false) {
 }
 
 
-
 async function renderAllHaulersFuelChart(forceRefresh = false) {
   try {
     const chartContainer = document.getElementById('fuelChartContainer');
@@ -3395,10 +3306,6 @@ async function renderAllHaulersFuelChart(forceRefresh = false) {
     }
   }
 }
-    
-
-
-
     async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
       try {
         const chartContainer = document.getElementById('fuelVsSpeedContainer');
