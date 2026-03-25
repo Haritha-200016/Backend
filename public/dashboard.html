@@ -916,6 +916,69 @@
       'default': ['daily', 'monthly']
     };
 
+    // Universal download function that works on all devices including mobile
+async function downloadFile(blob, filename) {
+  return new Promise((resolve, reject) => {
+    try {
+      // Check if the file is an Excel file
+      const isExcel = filename.endsWith('.xlsx') || filename.endsWith('.xls');
+      
+      // For iOS, use a different approach
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      
+      if (isIOS && isExcel) {
+        // iOS specific approach
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            // Create a temporary link
+            const link = document.createElement('a');
+            link.href = e.target.result;
+            link.download = filename;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            
+            // Trigger download
+            link.click();
+            
+            // Cleanup
+            setTimeout(() => {
+              document.body.removeChild(link);
+              URL.revokeObjectURL(e.target.result);
+              resolve();
+            }, 100);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = function() {
+          reject(new Error('Failed to read blob'));
+        };
+        reader.readAsDataURL(blob);
+      } else {
+        // Standard approach for Android and desktop
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.style.display = 'none';
+        
+        document.body.appendChild(link);
+        link.click();
+        
+        // Cleanup
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          resolve();
+        }, 150);
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      reject(error);
+    }
+  });
+}
     let cachedData = null;
     let pathHistory = {};
 
@@ -1672,28 +1735,28 @@
 
       // ==================== DUMP PANEL ====================
       if (panelId === 'Dump') {
-        grid.innerHTML = '';
+  grid.innerHTML = '';
 
-        const container = document.createElement('div');
-        container.style.cssText = `
+  const container = document.createElement('div');
+  container.style.cssText = `
     width: 100%;
     display: flex;
     flex-direction: column;
     gap: 20px;
   `;
 
-        // 🔹 Buttons
-        const buttonRow = document.createElement('div');
-        buttonRow.style.cssText = `display: flex; gap: 20px; width: 100%;`;
+  // Buttons
+  const buttonRow = document.createElement('div');
+  buttonRow.style.cssText = `display: flex; gap: 20px; width: 100%;`;
 
-        const dailyBtn = document.createElement('button');
-        dailyBtn.innerHTML = '📊 Daily Reports';
+  const dailyBtn = document.createElement('button');
+  dailyBtn.innerHTML = '📊 Daily Reports';
 
-        const monthlyBtn = document.createElement('button');
-        monthlyBtn.innerHTML = '📈 Monthly Reports';
+  const monthlyBtn = document.createElement('button');
+  monthlyBtn.innerHTML = '📈 Monthly Reports';
 
-        [dailyBtn, monthlyBtn].forEach(btn => {
-          btn.style.cssText = `
+  [dailyBtn, monthlyBtn].forEach(btn => {
+    btn.style.cssText = `
       flex: 1;
       padding: 14px;
       color: white;
@@ -1702,17 +1765,17 @@
       font-weight: bold;
       cursor: pointer;
     `;
-        });
+  });
 
-        dailyBtn.style.background = 'linear-gradient(#4CAF50,#45a049)';
-        monthlyBtn.style.background = 'linear-gradient(#2196F3,#1976D2)';
+  dailyBtn.style.background = 'linear-gradient(#4CAF50,#45a049)';
+  monthlyBtn.style.background = 'linear-gradient(#2196F3,#1976D2)';
 
-        buttonRow.appendChild(dailyBtn);
-        buttonRow.appendChild(monthlyBtn);
+  buttonRow.appendChild(dailyBtn);
+  buttonRow.appendChild(monthlyBtn);
 
-        // 🔹 Panel
-        const panel = document.createElement('div');
-        panel.style.cssText = `
+  // Panel
+  const panel = document.createElement('div');
+  panel.style.cssText = `
     background:#000;
     color:#fff;
     padding:50px;
@@ -1720,144 +1783,219 @@
     text-align:center;
   `;
 
-        panel.innerHTML = `
+  panel.innerHTML = `
     <div style="font-size:20px;">Live Dump Count</div>
     <div id="dumpCount" style="font-size:120px;color:#00ff00;">--</div>
     <div id="dumpTime" style="font-size:20px;color:#ccc;">--</div>
   `;
 
-        container.appendChild(buttonRow);
-        container.appendChild(panel);
-        grid.appendChild(container);
+  container.appendChild(buttonRow);
+  container.appendChild(panel);
+  grid.appendChild(container);
 
-        const dumpCompany = company || 'JMS';
-        const dumpSector = sector || 'Mining';
-        const dumpRegion = region;
+  const dumpCompany = company || 'JMS';
+  const dumpSector = sector || 'Mining';
+  const dumpRegion = region;
 
-        // ✅ FIXED FETCH
-        async function fetchDumpValue() {
-          const url = `${BASE_URL}/fetchdashboarddataby?company=${dumpCompany}&sector=${dumpSector}&region=${encodeURIComponent(dumpRegion)}`;
+  // Fetch dump value
+  async function fetchDumpValue() {
+    const url = `${BASE_URL}/fetchdashboarddataby?company=${dumpCompany}&sector=${dumpSector}&region=${encodeURIComponent(dumpRegion)}`;
 
-          try {
-            const res = await fetch(url);
-            const json = await res.json();
-
-            console.log("🔥 Dump API:", json);
-
-            if (json.status !== 'success' || !json.devices || json.devices.length === 0) {
-              console.warn("No devices");
-              return;
-            }
-
-            const device = json.devices[0]; // ✅ correct
-
-            document.getElementById('dumpCount').innerText =
-              device.count1 ?? 0;
-
-            document.getElementById('dumpTime').innerText =
-              new Date(device.timestamp).toLocaleString();
-
-          } catch (err) {
-            console.error("Dump error:", err);
-          }
-        }
-
-        // 🔹 Download (unchanged)
-async function downloadDumpReport(range = 'daily') {
-    showLoading(`Generating ${range} dump report...`);
-    
     try {
-        const url = range === 'daily'
-            ? `${BASE_URL}/getAllDevices-DailyData?device_id=all&timeRange=daily&region_id=10`
-            : `${BASE_URL}/getAll-Devices-MonthlyData?device_id=all&timeRange=monthly&region_id=10`;
+      const res = await fetch(url);
+      const json = await res.json();
 
-        const res = await fetch(url);
-        const data = await res.json();
+      console.log("🔥 Dump API:", json);
 
-        if (!data.data || data.data.length === 0) {
-            alert('No data available');
-            hideLoading();
-            return;
-        }
+      if (json.status !== 'success' || !json.devices || json.devices.length === 0) {
+        console.warn("No devices");
+        return;
+      }
 
-        // Prepare Excel data
-        const wsData = [['Device ID', 'Count1', 'Timestamp']];
-        data.data.forEach(d => {
-            wsData.push([d.device_id || '', d.count1 || '', d.timestamp || '']);
-        });
+      const device = json.devices[0];
 
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Dump Report');
-        
-        const now = new Date();
-        const dateStr = now.toISOString().split('T')[0];
-        const filename = `Dump_Report_${range}_${dateStr}.xlsx`;
-        
-        // Generate blob
-        const wbBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        const blob = new Blob([wbBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-        
-        // iOS: Show visible download link
-        if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-            const blobUrl = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = blobUrl;
-            link.download = filename;
-            link.innerHTML = `📥 Tap to Download ${filename}`;
-            link.style.cssText = `
-                display: block;
-                position: fixed;
-                bottom: 20px;
-                left: 20px;
-                right: 20px;
-                background: #4CAF50;
-                color: white;
-                text-align: center;
-                padding: 15px;
-                border-radius: 8px;
-                z-index: 9999;
-                text-decoration: none;
-                font-weight: bold;
-                font-size: 14px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            `;
-            document.body.appendChild(link);
-            setTimeout(() => {
-                if (link && link.remove) link.remove();
-                URL.revokeObjectURL(blobUrl);
-            }, 60000);
-        } else {
-            // Android/Desktop: Auto download
-            const downloadUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(downloadUrl);
-            }, 100);
-        }
-        
-        hideLoading();
-        
+      document.getElementById('dumpCount').innerText = device.count1 ?? 0;
+      document.getElementById('dumpTime').innerText = new Date(device.timestamp).toLocaleString();
+
     } catch (err) {
-        console.error('Download error:', err);
-        alert('Failed to download: ' + err.message);
-        hideLoading();
+      console.error("Dump error:", err);
     }
+  }
+
+  // Universal download function for mobile compatibility
+  async function downloadFile(blob, filename) {
+    return new Promise((resolve, reject) => {
+      try {
+        console.log(`📥 Downloading: ${filename}, Size: ${(blob.size / 1024).toFixed(2)} KB`);
+        
+        // Check if it's iOS
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        
+        if (isIOS) {
+          // iOS specific approach using FileReader
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            try {
+              const link = document.createElement('a');
+              link.href = e.target.result;
+              link.download = filename;
+              link.style.display = 'none';
+              document.body.appendChild(link);
+              link.click();
+              
+              setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(e.target.result);
+                resolve();
+              }, 100);
+            } catch (err) {
+              reject(err);
+            }
+          };
+          reader.onerror = function() {
+            reject(new Error('Failed to read blob on iOS'));
+          };
+          reader.readAsDataURL(blob);
+        } else {
+          // Android and desktop approach
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = filename;
+          link.style.display = 'none';
+          
+          document.body.appendChild(link);
+          link.click();
+          
+          setTimeout(() => {
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            resolve();
+          }, 150);
+        }
+      } catch (error) {
+        console.error('Download error:', error);
+        reject(error);
+      }
+    });
+  }
+
+  // Download dump report function
+  async function downloadDumpReport(range = 'daily') {
+    try {
+      showLoading(`Preparing ${range} report...`);
+      
+      const url = range === 'daily'
+        ? `${BASE_URL}/getAllDevices-DailyData?device_id=all&timeRange=daily&region_id=10`
+        : `${BASE_URL}/getAll-Devices-MonthlyData?device_id=all&timeRange=monthly&region_id=10`;
+
+      console.log('📡 Fetching dump report from:', url);
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      let blob;
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      let filename = `Dump_${range}_${dateStr}.xlsx`;
+
+      if (contentType && contentType.includes('application/json')) {
+        // Handle JSON response
+        const jsonData = await response.json();
+        console.log('JSON response received:', jsonData);
+        
+        if (jsonData.error) {
+          throw new Error(jsonData.error);
+        }
+        
+        // Check if the response has the expected structure
+        if (jsonData.data && Array.isArray(jsonData.data) && jsonData.data.length > 0) {
+          // Convert to Excel using SheetJS
+          const wsData = [['Device ID', 'Count1', 'Timestamp']];
+          jsonData.data.forEach(item => {
+            wsData.push([
+              item.device_id || 'N/A',
+              item.count1 || 0,
+              item.timestamp || new Date().toISOString()
+            ]);
+          });
+          
+          const ws = XLSX.utils.aoa_to_sheet(wsData);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, 'Dump Data');
+          
+          const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+          blob = new Blob([excelBuffer], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+          });
+        } else if (jsonData.report) {
+          // Handle base64 encoded report
+          let base64Data = jsonData.report;
+          if (base64Data.includes('base64,')) {
+            base64Data = base64Data.split('base64,')[1];
+          }
+          
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          blob = new Blob([bytes], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+          });
+        } else {
+          // If no data, create a simple report
+          const wsData = [['Message', 'No data available for this period']];
+          const ws = XLSX.utils.aoa_to_sheet(wsData);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, 'No Data');
+          const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+          blob = new Blob([excelBuffer], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+          });
+        }
+      } else {
+        // Handle direct file download
+        blob = await response.blob();
+        
+        // Check if blob is valid
+        if (blob.size === 0) {
+          throw new Error('Received empty file from server');
+        }
+      }
+
+      // Download the file
+      await downloadFile(blob, filename);
+      
+      console.log(`✅ Dump report downloaded: ${filename}`);
+      hideLoading();
+      
+    } catch (error) {
+      console.error('Error downloading dump report:', error);
+      alert(`Failed to download report: ${error.message}`);
+      hideLoading();
+    }
+  }
+
+  // Set button click handlers
+  dailyBtn.onclick = async () => {
+    await downloadDumpReport('daily');
+  };
+  
+  monthlyBtn.onclick = async () => {
+    await downloadDumpReport('monthly');
+  };
+
+  // Start fetching dump value
+  fetchDumpValue();
+  setInterval(fetchDumpValue, 30000);
 }
 
 
-        dailyBtn.onclick = () => downloadDumpReport('daily');
-        monthlyBtn.onclick = () => downloadDumpReport('monthly');
-
-        fetchDumpValue();
-        setInterval(fetchDumpValue, 30000);
-      }
-      // ==================== DRONE STREAM PANEL ====================
+// ==================== DRONE STREAM PANEL ====================
       if (panelId === 'DroneStream') {
         container.innerHTML = `
           <header>
@@ -3696,7 +3834,7 @@ async function renderAllHaulersFuelChart(forceRefresh = false) {
     window.renderFuelGradientForHauler = renderFuelGradientForHauler;
     window.renderAllHaulersFuelChart = renderAllHaulersFuelChart;
     window.renderFuelVsSpeedForHauler = renderFuelVsSpeedForHauler;
-    window.renderAllHaulersFuelVsSpeed = renderrenderAllHaulersFuelVsSpeed;
+    window.renderAllHaulersFuelVsSpeed = renderAllHaulersFuelVsSpeed;
 
     // ==================== DYNAMIC MAP SIMULATION FOR BOTH REGIONS ====================
     async function initializeDynamicMapSimulation() {
