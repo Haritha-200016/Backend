@@ -1302,26 +1302,68 @@
       container.appendChild(buttonsContainer);
     }
 
-function downloadReport(reportType, shift = null) {
-  const region_id = regionMapping[region] || 5;
+    async function downloadReport(reportType, shift = null) {
+      const region_id = regionMapping[region] || 5;
 
-  let url = "";
+      let message = `Generating ${reportType} report for ${region}...`;
+      if (reportType === 'shift') message = `Generating ${shift} shift report for ${region}...`;
 
-  if (reportType === 'shift') {
-    url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
-  } 
-  else if (reportType === 'daily') {
-    url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=daily&region_id=${region_id}`;
-  } 
-  else if (reportType === 'monthly') {
-    url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
-  }
+      console.log(message);
+      showLoading(message);
 
-  console.log("📥 Downloading:", url);
+      try {
+        let url;
+        if (reportType === 'shift') {
+          url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
+        } else if (reportType === 'daily') {
+          url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=daily&region_id=${region_id}`;
+        } else if (reportType === 'monthly') {
+          url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
+        }
 
-  // 🔥 KEY CHANGE (NO BLOB)
-  window.open(url, "_blank");
-}
+        console.log(`📡 Fetching from: ${url}`);
+        const response = await fetch(url);
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        const contentType = response.headers.get('content-type');
+
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          alert(`Analysis failed: ${errorData.error || 'Unknown error'}`);
+          return;
+        }
+
+        const blob = await response.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        let filename = `Analysis_${region}_${reportType}`;
+        if (reportType === 'shift') filename += `_${shift}`;
+        filename += `_${dateStr}.xlsx`;
+
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(downloadUrl);
+        }, 100);
+
+        console.log(`✅ Analysis report downloaded: ${filename}`);
+
+      } catch (error) {
+        console.error('Error generating analysis:', error);
+        alert(`Failed to generate analysis: ${error.message}`);
+      } finally {
+        hideLoading();
+      }
+    }
+
     // Make functions globally available
     window.downloadReport = downloadReport;
     window.getDisplayName = getDisplayName;
@@ -1721,25 +1763,92 @@ function downloadReport(reportType, shift = null) {
         }
 
         // 🔹 Download (unchanged)
-        async function downloadDumpReport(range = 'daily') {
-          const url = range === 'daily'
+async function downloadDumpReport(range = 'daily') {
+    showLoading(`Generating ${range} dump report...`);
+    
+    try {
+        const url = range === 'daily'
             ? `${BASE_URL}/getAllDevices-DailyData?device_id=all&timeRange=daily&region_id=10`
             : `${BASE_URL}/getAll-Devices-MonthlyData?device_id=all&timeRange=monthly&region_id=10`;
 
-          const res = await fetch(url);
-          const data = await res.json();
+        const res = await fetch(url);
+        const data = await res.json();
 
-          if (!data.data) return alert('No data');
-
-          const wsData = [['Device ID', 'Count1', 'Timestamp']];
-          data.data.forEach(d => wsData.push([d.device_id, d.count1, d.timestamp]));
-
-          const ws = XLSX.utils.aoa_to_sheet(wsData);
-          const wb = XLSX.utils.book_new();
-          XLSX.utils.book_append_sheet(wb, ws, 'Dump');
-
-          XLSX.writeFile(wb, `Dump_${range}.xlsx`);
+        if (!data.data || data.data.length === 0) {
+            alert('No data available');
+            hideLoading();
+            return;
         }
+
+        const wsData = [['Device ID', 'Count1', 'Timestamp']];
+        data.data.forEach(d => {
+            wsData.push([d.device_id || '', d.count1 || '', d.timestamp || '']);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Dump Report');
+        
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        const filename = `Dump_Report_${range}_${dateStr}.xlsx`;
+        
+        const wbBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        
+        // iOS: Show visible download link
+        if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = filename;
+            link.innerHTML = `📥 Tap to Download ${filename}`;
+            link.style.cssText = `
+                display: block;
+                position: fixed;
+                bottom: 20px;
+                left: 20px;
+                right: 20px;
+                background: #4CAF50;
+                color: white;
+                text-align: center;
+                padding: 15px;
+                border-radius: 8px;
+                z-index: 9999;
+                text-decoration: none;
+                font-weight: bold;
+                font-size: 14px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            `;
+            document.body.appendChild(link);
+            setTimeout(() => {
+                if (link && link.remove) link.remove();
+                URL.revokeObjectURL(blobUrl);
+            }, 60000);
+        } else {
+            // Android/Desktop: Auto download
+            const downloadUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(downloadUrl);
+            }, 100);
+        }
+        
+        hideLoading();
+        
+    } catch (err) {
+        console.error('Download error:', err);
+        alert('Failed to download: ' + err.message);
+        hideLoading();
+    }
+}     
+
+
 
         dailyBtn.onclick = () => downloadDumpReport('daily');
         monthlyBtn.onclick = () => downloadDumpReport('monthly');
