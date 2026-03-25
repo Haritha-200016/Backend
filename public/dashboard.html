@@ -1780,6 +1780,7 @@ async function downloadDumpReport(range = 'daily') {
             return;
         }
 
+        // Prepare Excel data
         const wsData = [['Device ID', 'Count1', 'Timestamp']];
         data.data.forEach(d => {
             wsData.push([d.device_id || '', d.count1 || '', d.timestamp || '']);
@@ -1793,6 +1794,7 @@ async function downloadDumpReport(range = 'daily') {
         const dateStr = now.toISOString().split('T')[0];
         const filename = `Dump_Report_${range}_${dateStr}.xlsx`;
         
+        // Generate blob
         const wbBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
         const blob = new Blob([wbBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
         
@@ -1846,8 +1848,7 @@ async function downloadDumpReport(range = 'daily') {
         alert('Failed to download: ' + err.message);
         hideLoading();
     }
-}     
-
+}
 
 
         dailyBtn.onclick = () => downloadDumpReport('daily');
