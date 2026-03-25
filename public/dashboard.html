@@ -1734,8 +1734,7 @@ async function downloadFile(blob, filename) {
       }
 
       // ==================== DUMP PANEL ====================
-// ==================== DUMP PANEL ====================
-// ==================== DUMP PANEL - MOBILE OPTIMIZED ====================
+// ==================== DUMP PANEL - COMPLETE WORKING SOLUTION ====================
 if (panelId === 'Dump') {
   grid.innerHTML = '';
 
@@ -1825,80 +1824,112 @@ if (panelId === 'Dump') {
     }
   }
 
-  // ========== MOBILE-FRIENDLY DOWNLOAD FUNCTION ==========
-  async function downloadExcelFile(blob, filename) {
+  // ========== METHOD 1: DIRECT DOWNLOAD (Works on Android) ==========
+  async function directDownload(blob, filename) {
     return new Promise((resolve, reject) => {
       try {
-        // Check if it's iOS
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
         
-        if (isIOS) {
-          // iOS: Use FileReader + open in new tab (works best)
-          const reader = new FileReader();
-          reader.onload = function(e) {
-            // Create a new window/tab with the file
-            const newWindow = window.open();
-            if (newWindow) {
-              newWindow.document.write(`
-                <html>
-                  <head>
-                    <title>Download ${filename}</title>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                  </head>
-                  <body style="display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #000; color: #fff; font-family: Arial;">
-                    <div style="text-align: center;">
-                      <h2>Your file is ready</h2>
-                      <p>${filename}</p>
-                      <button onclick="window.location.href='${e.target.result}'" style="background: #4CAF50; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 18px; cursor: pointer;">
-                        📥 Tap to Download
-                      </button>
-                      <p style="margin-top: 20px; font-size: 12px; color: #ccc;">Tap the button above to save the file</p>
-                    </div>
-                    <script>
-                      // Auto trigger download after 1 second
-                      setTimeout(() => {
-                        window.location.href = '${e.target.result}';
-                      }, 1000);
-                    <\/script>
-                  </body>
-                </html>
-              `);
-              newWindow.document.close();
-              resolve();
-            } else {
-              // If popup blocked, fallback to direct download
-              const link = document.createElement('a');
-              link.href = e.target.result;
-              link.download = filename;
-              link.click();
-              resolve();
-            }
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        } else {
-          // Android/Desktop: Use standard download
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          
-          setTimeout(() => {
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            resolve();
-          }, 1000);
-        }
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          resolve(true);
+        }, 1000);
       } catch (error) {
-        console.error('Download error:', error);
         reject(error);
       }
     });
   }
 
-  // ========== MOBILE-OPTIMIZED DOWNLOAD FUNCTION ==========
+  // ========== METHOD 2: WEB SHARE API (Works on modern mobile) ==========
+  async function shareDownload(blob, filename) {
+    try {
+      // Check if Web Share API is supported
+      if (navigator.share && blob.size < 10000000) { // 10MB limit
+        const file = new File([blob], filename, { type: blob.type });
+        await navigator.share({
+          title: 'Download Mining Report',
+          text: `${filename} is ready to download`,
+          files: [file]
+        });
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.log('Share failed:', err);
+      return false;
+    }
+  }
+
+  // ========== METHOD 3: SAVE AS BLOB (iOS Fallback) ==========
+  async function iosDownload(blob, filename) {
+    return new Promise((resolve, reject) => {
+      try {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          // Create a temporary link with data URL
+          const link = document.createElement('a');
+          link.href = e.target.result;
+          link.download = filename;
+          link.style.display = 'none';
+          document.body.appendChild(link);
+          link.click();
+          
+          setTimeout(() => {
+            document.body.removeChild(link);
+            resolve(true);
+          }, 1000);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // ========== METHOD 4: OPEN IN NEW WINDOW (Universal Fallback) ==========
+  async function openInNewWindow(blob, filename) {
+    return new Promise((resolve, reject) => {
+      try {
+        const url = URL.createObjectURL(blob);
+        const newWindow = window.open(url, '_blank');
+        
+        if (newWindow) {
+          newWindow.focus();
+          // Close the window after a delay
+          setTimeout(() => {
+            URL.revokeObjectURL(url);
+            resolve(true);
+          }, 5000);
+        } else {
+          reject(new Error('Popup blocked'));
+        }
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // ========== METHOD 5: COPY TO CLIPBOARD (Last Resort) ==========
+  async function copyToClipboard(blob, filename) {
+    try {
+      const text = `Download file: ${filename}\nSize: ${(blob.size / 1024).toFixed(2)} KB\nPlease enable downloads in your browser settings.`;
+      await navigator.clipboard.writeText(text);
+      alert(`Information copied to clipboard. Please enable downloads in your browser to save ${filename}`);
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  // ========== MAIN DOWNLOAD FUNCTION WITH MULTIPLE FALLBACKS ==========
   async function downloadDumpReport(range = 'daily') {
     try {
       showLoading(`Preparing ${range} report...`);
@@ -1962,44 +1993,85 @@ if (panelId === 'Dump') {
         }
       }
 
-      // Download the file
-      await downloadExcelFile(blob, filename);
-      
-      // Show success message with instructions
+      // Try multiple download methods in sequence
+      let downloadSuccess = false;
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const successMsg = document.createElement('div');
+      
+      // For iOS, try iOS method first
       if (isIOS) {
+        try {
+          console.log('Trying iOS download method...');
+          await iosDownload(blob, filename);
+          downloadSuccess = true;
+        } catch (err) {
+          console.log('iOS method failed:', err);
+        }
+      }
+      
+      // Try direct download (Android/Desktop)
+      if (!downloadSuccess) {
+        try {
+          console.log('Trying direct download...');
+          await directDownload(blob, filename);
+          downloadSuccess = true;
+        } catch (err) {
+          console.log('Direct download failed:', err);
+        }
+      }
+      
+      // Try open in new window
+      if (!downloadSuccess) {
+        try {
+          console.log('Trying open in new window...');
+          await openInNewWindow(blob, filename);
+          downloadSuccess = true;
+        } catch (err) {
+          console.log('Open in new window failed:', err);
+        }
+      }
+      
+      // Try Web Share API
+      if (!downloadSuccess) {
+        try {
+          console.log('Trying Web Share API...');
+          const shared = await shareDownload(blob, filename);
+          if (shared) downloadSuccess = true;
+        } catch (err) {
+          console.log('Share failed:', err);
+        }
+      }
+      
+      // Last resort: Copy to clipboard with instructions
+      if (!downloadSuccess) {
+        await copyToClipboard(blob, filename);
+      }
+      
+      // Show success message
+      const successMsg = document.createElement('div');
+      if (downloadSuccess) {
         successMsg.innerHTML = `
           <div style="position: fixed; bottom: 20px; left: 20px; right: 20px; background: #4CAF50; color: white; padding: 15px; border-radius: 8px; text-align: center; z-index: 10000; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-            ✅ Report Ready!<br>
-            <small style="font-size: 12px;">A new tab opened with download link. Tap the button to save.</small>
+            ✅ ${range.toUpperCase()} Report Ready!<br>
+            <small style="font-size: 12px;">Check your Downloads folder or Files app</small>
           </div>
         `;
       } else {
-        successMsg.textContent = `✅ ${range.toUpperCase()} report downloaded! Check your Downloads folder.`;
-        successMsg.style.cssText = `
-          position: fixed;
-          bottom: 20px;
-          left: 20px;
-          right: 20px;
-          background: #4CAF50;
-          color: white;
-          padding: 12px;
-          border-radius: 8px;
-          text-align: center;
-          z-index: 10000;
-          font-weight: bold;
+        successMsg.innerHTML = `
+          <div style="position: fixed; bottom: 20px; left: 20px; right: 20px; background: #FF9800; color: white; padding: 15px; border-radius: 8px; text-align: center; z-index: 10000; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+            ⚠️ Download instructions copied to clipboard<br>
+            <small style="font-size: 12px;">Please enable downloads in your browser settings</small>
+          </div>
         `;
       }
       document.body.appendChild(successMsg);
       setTimeout(() => successMsg.remove(), 5000);
       
-      console.log(`✅ Dump report ready: ${filename}`);
+      console.log(`✅ ${range.toUpperCase()} report processed`);
+      hideLoading();
       
     } catch (error) {
       console.error('Error downloading dump report:', error);
       alert(`Failed to download: ${error.message}`);
-    } finally {
       hideLoading();
     }
   }
