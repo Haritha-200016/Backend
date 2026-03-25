@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 
   <style>
     /* Your existing styles remain exactly the same */
@@ -887,7 +888,7 @@
 
   <script>
     // ==================== CONFIGURATION ====================
-    const BASE_URL = 'http://104.154.141.198:5003';
+    const BASE_URL = 'http://10.5.48.30:5001';
     const params = new URLSearchParams(window.location.search);
     const sector = params.get('sector') || '';
     const company = (params.get('company') || '').trim();
@@ -1311,7 +1312,16 @@ async function downloadReport(reportType, shift = null) {
     console.log(message);
     showLoading(message);
 
+    // Prevent multiple downloads
+    if (window.isDownloading) {
+        console.warn('Download already in progress');
+        return;
+    }
+
     try {
+        window.isDownloading = true;
+
+        // Build URL to fetch data
         let url;
         if (reportType === 'shift') {
             url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
@@ -1321,9 +1331,51 @@ async function downloadReport(reportType, shift = null) {
             url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
         }
 
-        // Fetch the file
+        console.log(`📡 Fetching from: ${url}`);
+        
+        // Fetch the JSON data (not the Excel file)
         const response = await fetch(url);
-        const blob = await response.blob();
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Get the JSON data
+        const data = await response.json();
+        
+        console.log('📊 Data received:', data);
+        
+        // Check if we have data
+        if (!data.data || data.data.length === 0) {
+            alert('No data available for the selected period');
+            return;
+        }
+
+        // Prepare data for Excel
+        const wsData = [];
+        
+        // Add headers
+        const headers = Object.keys(data.data[0]);
+        wsData.push(headers);
+        
+        // Add data rows
+        data.data.forEach(row => {
+            const rowData = [];
+            headers.forEach(header => {
+                let value = row[header];
+                // Format timestamp if needed
+                if (header === 'timestamp' && value) {
+                    value = new Date(value).toLocaleString();
+                }
+                rowData.push(value !== null && value !== undefined ? value : '');
+            });
+            wsData.push(rowData);
+        });
+        
+        // Create Excel file using XLSX (like your friend's code)
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Analysis Report');
         
         // Create filename
         const now = new Date();
@@ -1332,99 +1384,86 @@ async function downloadReport(reportType, shift = null) {
         if (reportType === 'shift') filename += `_${shift}`;
         filename += `_${dateStr}.xlsx`;
         
-        // Create download URL
-        const downloadUrl = URL.createObjectURL(blob);
+        // Generate both formats for mobile compatibility
+        const wbBuffer = XLSX.write(wb, {
+            bookType: 'xlsx',
+            type: 'array'
+        });
         
-        // For mobile: Show a visible link that user can tap
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        
-        if (isMobile) {
-            // Hide loading
-            hideLoading();
+        // 📱 iOS Download Workaround (exactly like your friend's code)
+        if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            console.log('📱 iOS device detected, using iOS download method');
+            const blob = new Blob([wbBuffer], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            });
             
-            // Create a visible download button
-            const downloadContainer = document.createElement('div');
-            downloadContainer.style.cssText = `
-                position: fixed;
-                bottom: 20px;
-                left: 20px;
-                right: 20px;
-                background: white;
-                padding: 20px;
-                border-radius: 12px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                z-index: 10000;
-                text-align: center;
-                font-family: system-ui, -apple-system, sans-serif;
-            `;
+            // Create object URL
+            const blobUrl = window.URL.createObjectURL(blob);
             
-            downloadContainer.innerHTML = `
-                <div style="font-size: 16px; margin-bottom: 12px; color: #333;">
-                    ✅ Report ready!
-                </div>
-                <a href="${downloadUrl}" 
-                   download="${filename}"
-                   style="
-                       display: inline-block;
-                       background: #4CAF50;
-                       color: white;
-                       padding: 12px 24px;
-                       text-decoration: none;
-                       border-radius: 8px;
-                       font-weight: bold;
-                       font-size: 16px;
-                   ">
-                    📥 Tap to Save Report
-                </a>
-                <div style="font-size: 12px; margin-top: 12px; color: #666;">
-                    File: ${filename}
-                </div>
-                <button id="closeDownloadBtn" style="
-                    margin-top: 12px;
-                    background: #f0f0f0;
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 6px;
-                    font-size: 14px;
-                    cursor: pointer;
-                ">Close</button>
-            `;
-            
-            document.body.appendChild(downloadContainer);
-            
-            // Close button handler
-            document.getElementById('closeDownloadBtn').onclick = () => {
-                document.body.removeChild(downloadContainer);
-                URL.revokeObjectURL(downloadUrl);
-            };
-            
-            // Auto-close after 30 seconds
-            setTimeout(() => {
-                if (document.body.contains(downloadContainer)) {
-                    document.body.removeChild(downloadContainer);
-                    URL.revokeObjectURL(downloadUrl);
-                }
-            }, 30000);
-            
-        } else {
-            // Desktop: Auto download
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            
-            setTimeout(() => {
-                document.body.removeChild(link);
-                URL.revokeObjectURL(downloadUrl);
-                hideLoading();
-            }, 100);
+            // Try to open in new tab for iOS
+            const newWindow = window.open(blobUrl, '_blank');
+            if (!newWindow || newWindow.closed) {
+                // If popup blocked, show a link like your friend's code
+                alert('Please allow popups to download the file, or tap the link below to save:');
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = filename;
+                link.innerHTML = `📥 Download ${filename}`;
+                link.style.cssText = `
+                    display: block;
+                    padding: 15px;
+                    background: #4CAF50;
+                    color: white;
+                    text-align: center;
+                    border-radius: 8px;
+                    margin: 20px;
+                    text-decoration: none;
+                    font-size: 16px;
+                    font-weight: bold;
+                `;
+                document.body.appendChild(link);
+                
+                setTimeout(() => {
+                    if (document.body.contains(link)) {
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(blobUrl);
+                    }
+                }, 30000);
+            }
+            return;
         }
         
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Download failed: ' + error.message);
+        // 🌐 Android and Desktop Download
+        console.log('📱 Using standard download method');
+        const blob = new Blob([wbBuffer], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        });
+        
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.download = filename;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        
+        // Trigger download
+        a.click();
+        
+        // Cleanup
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(downloadUrl);
+            console.log('✅ Download completed');
+        }, 100);
+        
         hideLoading();
+
+    } catch (err) {
+        console.error('Download error:', err);
+        alert(`Failed to download report: ${err.message || 'Unknown error'}`);
+        hideLoading();
+    } finally {
+        window.isDownloading = false;
     }
 }
     // Make functions globally available
