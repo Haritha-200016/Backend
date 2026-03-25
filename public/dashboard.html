@@ -1308,6 +1308,7 @@ async function downloadReport(reportType, shift = null) {
     let message = `Generating ${reportType} report for ${region}...`;
     if (reportType === 'shift') message = `Generating ${shift} shift report for ${region}...`;
     
+    console.log(message);
     showLoading(message);
 
     try {
@@ -1320,15 +1321,104 @@ async function downloadReport(reportType, shift = null) {
             url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
         }
 
-        // For mobile: Open in new tab (user can save from there)
-        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        // Fetch the file
+        const response = await fetch(url);
+        const blob = await response.blob();
+        
+        // Create filename
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        let filename = `Analysis_${region}_${reportType}`;
+        if (reportType === 'shift') filename += `_${shift}`;
+        filename += `_${dateStr}.xlsx`;
+        
+        // Create download URL
+        const downloadUrl = URL.createObjectURL(blob);
+        
+        // For mobile: Show a visible link that user can tap
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+            // Hide loading
             hideLoading();
-            window.open(url, '_blank');
-            alert('File opened in new tab. Tap the share button and select "Save to Files" to download.');
+            
+            // Create a visible download button
+            const downloadContainer = document.createElement('div');
+            downloadContainer.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                left: 20px;
+                right: 20px;
+                background: white;
+                padding: 20px;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 10000;
+                text-align: center;
+                font-family: system-ui, -apple-system, sans-serif;
+            `;
+            
+            downloadContainer.innerHTML = `
+                <div style="font-size: 16px; margin-bottom: 12px; color: #333;">
+                    ✅ Report ready!
+                </div>
+                <a href="${downloadUrl}" 
+                   download="${filename}"
+                   style="
+                       display: inline-block;
+                       background: #4CAF50;
+                       color: white;
+                       padding: 12px 24px;
+                       text-decoration: none;
+                       border-radius: 8px;
+                       font-weight: bold;
+                       font-size: 16px;
+                   ">
+                    📥 Tap to Save Report
+                </a>
+                <div style="font-size: 12px; margin-top: 12px; color: #666;">
+                    File: ${filename}
+                </div>
+                <button id="closeDownloadBtn" style="
+                    margin-top: 12px;
+                    background: #f0f0f0;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    cursor: pointer;
+                ">Close</button>
+            `;
+            
+            document.body.appendChild(downloadContainer);
+            
+            // Close button handler
+            document.getElementById('closeDownloadBtn').onclick = () => {
+                document.body.removeChild(downloadContainer);
+                URL.revokeObjectURL(downloadUrl);
+            };
+            
+            // Auto-close after 30 seconds
+            setTimeout(() => {
+                if (document.body.contains(downloadContainer)) {
+                    document.body.removeChild(downloadContainer);
+                    URL.revokeObjectURL(downloadUrl);
+                }
+            }, 30000);
+            
         } else {
             // Desktop: Auto download
-            window.open(url, '_blank');
-            setTimeout(() => hideLoading(), 2000);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(downloadUrl);
+                hideLoading();
+            }, 100);
         }
         
     } catch (error) {
