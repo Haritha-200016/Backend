@@ -1302,35 +1302,25 @@
       container.appendChild(buttonsContainer);
     }
 
-async function downloadReport(reportType, shift = null) {
-    const region_id = regionMapping[region] || 5;
+function downloadReport(reportType, shift = null) {
+  const region_id = regionMapping[region] || 5;
 
-    let message = `Generating ${reportType} report for ${region}...`;
-    if (reportType === 'shift') message = `Generating ${shift} shift report for ${region}...`;
-    
-    showLoading(message);
+  let url = "";
 
-    try {
-        let url;
-        if (reportType === 'shift') {
-            url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
-        } else if (reportType === 'daily') {
-            url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=daily&region_id=${region_id}`;
-        } else if (reportType === 'monthly') {
-            url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
-        }
+  if (reportType === 'shift') {
+    url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
+  } 
+  else if (reportType === 'daily') {
+    url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=daily&region_id=${region_id}`;
+  } 
+  else if (reportType === 'monthly') {
+    url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
+  }
 
-        // Open in new tab - this works on all devices
-        window.open(url, '_blank');
-        
-        // Hide loading after 2 seconds
-        setTimeout(() => hideLoading(), 2000);
-        
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Download failed: ' + error.message);
-        hideLoading();
-    }
+  console.log("📥 Downloading:", url);
+
+  // 🔥 KEY CHANGE (NO BLOB)
+  window.open(url, "_blank");
 }
     // Make functions globally available
     window.downloadReport = downloadReport;
@@ -1731,63 +1721,26 @@ async function downloadReport(reportType, shift = null) {
         }
 
         // 🔹 Download (unchanged)
-async function downloadDumpReport(range = 'daily') {
-    showLoading(`Generating ${range} dump report...`);
-    
-    try {
-        const url = range === 'daily'
+        async function downloadDumpReport(range = 'daily') {
+          const url = range === 'daily'
             ? `${BASE_URL}/getAllDevices-DailyData?device_id=all&timeRange=daily&region_id=10`
             : `${BASE_URL}/getAll-Devices-MonthlyData?device_id=all&timeRange=monthly&region_id=10`;
 
-        const res = await fetch(url);
-        const data = await res.json();
+          const res = await fetch(url);
+          const data = await res.json();
 
-        if (!data.data || data.data.length === 0) {
-            alert('No data available');
-            hideLoading();
-            return;
+          if (!data.data) return alert('No data');
+
+          const wsData = [['Device ID', 'Count1', 'Timestamp']];
+          data.data.forEach(d => wsData.push([d.device_id, d.count1, d.timestamp]));
+
+          const ws = XLSX.utils.aoa_to_sheet(wsData);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, 'Dump');
+
+          XLSX.writeFile(wb, `Dump_${range}.xlsx`);
         }
 
-        // Prepare Excel data
-        const wsData = [['Device ID', 'Count1', 'Timestamp']];
-        data.data.forEach(d => {
-            wsData.push([d.device_id || '', d.count1 || '', d.timestamp || '']);
-        });
-
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Dump Report');
-        
-        const now = new Date();
-        const dateStr = now.toISOString().split('T')[0];
-        const filename = `Dump_Report_${range}_${dateStr}.xlsx`;
-        
-        // Write file - this triggers download on desktop
-        XLSX.writeFile(wb, filename);
-        
-        // For mobile, show a link
-        if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-            setTimeout(() => {
-                const blobData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-                const blobUrl = URL.createObjectURL(new Blob([blobData], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
-                const link = document.createElement('a');
-                link.href = blobUrl;
-                link.download = filename;
-                link.innerHTML = `📥 Tap to Download ${filename}`;
-                link.style.cssText = 'display:block;position:fixed;bottom:20px;left:20px;right:20px;background:#4CAF50;color:white;text-align:center;padding:15px;border-radius:8px;z-index:9999;';
-                document.body.appendChild(link);
-                setTimeout(() => { if(link) link.remove(); }, 30000);
-            }, 500);
-        }
-        
-        hideLoading();
-        
-    } catch (err) {
-        console.error('Download error:', err);
-        alert('Failed to download: ' + err.message);
-        hideLoading();
-    }
-}
         dailyBtn.onclick = () => downloadDumpReport('daily');
         monthlyBtn.onclick = () => downloadDumpReport('monthly');
 
