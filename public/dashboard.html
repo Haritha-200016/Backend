@@ -888,7 +888,7 @@
 
   <script>
     // ==================== CONFIGURATION ====================
-    const BASE_URL = 'http://10.5.48.30:5001';
+    const BASE_URL = 'http://104.154.141.198:5003';
     const params = new URLSearchParams(window.location.search);
     const sector = params.get('sector') || '';
     const company = (params.get('company') || '').trim();
@@ -1312,7 +1312,6 @@ async function downloadReport(reportType, shift = null) {
     console.log(message);
     showLoading(message);
 
-    // Prevent multiple downloads
     if (window.isDownloading) {
         console.warn('Download already in progress');
         return;
@@ -1321,7 +1320,7 @@ async function downloadReport(reportType, shift = null) {
     try {
         window.isDownloading = true;
 
-        // Build URL to fetch data
+        // Build URL (your existing endpoint that returns Excel)
         let url;
         if (reportType === 'shift') {
             url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
@@ -1331,51 +1330,11 @@ async function downloadReport(reportType, shift = null) {
             url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
         }
 
-        console.log(`📡 Fetching from: ${url}`);
+        console.log(`📡 Fetching Excel from: ${url}`);
         
-        // Fetch the JSON data (not the Excel file)
+        // Fetch the Excel file
         const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        // Get the JSON data
-        const data = await response.json();
-        
-        console.log('📊 Data received:', data);
-        
-        // Check if we have data
-        if (!data.data || data.data.length === 0) {
-            alert('No data available for the selected period');
-            return;
-        }
-
-        // Prepare data for Excel
-        const wsData = [];
-        
-        // Add headers
-        const headers = Object.keys(data.data[0]);
-        wsData.push(headers);
-        
-        // Add data rows
-        data.data.forEach(row => {
-            const rowData = [];
-            headers.forEach(header => {
-                let value = row[header];
-                // Format timestamp if needed
-                if (header === 'timestamp' && value) {
-                    value = new Date(value).toLocaleString();
-                }
-                rowData.push(value !== null && value !== undefined ? value : '');
-            });
-            wsData.push(rowData);
-        });
-        
-        // Create Excel file using XLSX (like your friend's code)
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Analysis Report');
+        const blob = await response.blob();
         
         // Create filename
         const now = new Date();
@@ -1384,89 +1343,77 @@ async function downloadReport(reportType, shift = null) {
         if (reportType === 'shift') filename += `_${shift}`;
         filename += `_${dateStr}.xlsx`;
         
-        // Generate both formats for mobile compatibility
-        const wbBuffer = XLSX.write(wb, {
-            bookType: 'xlsx',
-            type: 'array'
-        });
-        
-        // 📱 iOS Download Workaround (exactly like your friend's code)
+        // iOS specific handling (like your friend's code)
         if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-            console.log('📱 iOS device detected, using iOS download method');
-            const blob = new Blob([wbBuffer], {
-                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            });
+            console.log('📱 iOS device - showing download link');
             
-            // Create object URL
-            const blobUrl = window.URL.createObjectURL(blob);
+            const blobUrl = URL.createObjectURL(blob);
             
-            // Try to open in new tab for iOS
-            const newWindow = window.open(blobUrl, '_blank');
-            if (!newWindow || newWindow.closed) {
-                // If popup blocked, show a link like your friend's code
-                alert('Please allow popups to download the file, or tap the link below to save:');
-                const link = document.createElement('a');
-                link.href = blobUrl;
-                link.download = filename;
-                link.innerHTML = `📥 Download ${filename}`;
-                link.style.cssText = `
-                    display: block;
-                    padding: 15px;
-                    background: #4CAF50;
-                    color: white;
-                    text-align: center;
-                    border-radius: 8px;
-                    margin: 20px;
-                    text-decoration: none;
-                    font-size: 16px;
-                    font-weight: bold;
-                `;
-                document.body.appendChild(link);
-                
-                setTimeout(() => {
-                    if (document.body.contains(link)) {
-                        document.body.removeChild(link);
-                        window.URL.revokeObjectURL(blobUrl);
-                    }
-                }, 30000);
-            }
+            // Show clickable link (same as your friend's working code)
+            alert('Tap the link below to save the file:');
+            
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = filename;
+            link.innerHTML = `📥 Download ${filename}`;
+            link.style.cssText = `
+                display: block;
+                padding: 15px;
+                background: #4CAF50;
+                color: white;
+                text-align: center;
+                border-radius: 8px;
+                margin: 20px;
+                text-decoration: none;
+                font-size: 16px;
+                font-weight: bold;
+                position: fixed;
+                bottom: 20px;
+                left: 20px;
+                right: 20px;
+                z-index: 10000;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            `;
+            document.body.appendChild(link);
+            
+            setTimeout(() => {
+                if (document.body.contains(link)) {
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(blobUrl);
+                }
+            }, 60000); // Remove after 1 minute
+            
+            hideLoading();
             return;
         }
         
-        // 🌐 Android and Desktop Download
-        console.log('📱 Using standard download method');
-        const blob = new Blob([wbBuffer], {
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        });
-        
+        // Android and Desktop - auto download
+        console.log('📱 Android/Desktop - auto downloading');
         const downloadUrl = URL.createObjectURL(blob);
-        const a = document.createElement("a");
+        const a = document.createElement('a');
         a.href = downloadUrl;
         a.download = filename;
-        a.style.display = "none";
+        a.style.display = 'none';
         document.body.appendChild(a);
-        
-        // Trigger download
         a.click();
         
-        // Cleanup
         setTimeout(() => {
             document.body.removeChild(a);
             URL.revokeObjectURL(downloadUrl);
-            console.log('✅ Download completed');
+            hideLoading();
         }, 100);
         
-        hideLoading();
-
     } catch (err) {
         console.error('Download error:', err);
-        alert(`Failed to download report: ${err.message || 'Unknown error'}`);
+        alert(`Failed to download report: ${err.message}`);
         hideLoading();
     } finally {
         window.isDownloading = false;
     }
-}
-    // Make functions globally available
+} // Make functions globally available
+    
+
+
     window.downloadReport = downloadReport;
     window.getDisplayName = getDisplayName;
     window.getDeviceIdFromDisplayName = getDeviceIdFromDisplayName;
