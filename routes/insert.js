@@ -681,32 +681,46 @@ const forgotPassword = (req, res) => {
 
 // Get last 5 z-axis values endpoint (unchanged)
 const getLast10ZAxis = (req, res) => {
-  const query = `
-    SELECT device_id, pitch AS z_axis, timestamp
-    FROM (
-      SELECT device_id, pitch, timestamp,
-             ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY timestamp DESC) as rn
-      FROM realtime_sensor_data
-      WHERE device_id LIKE 'D%'
-    ) t
-    WHERE rn <= 5
-    ORDER BY device_id, timestamp DESC
-  `;
+  const { company, region } = req.query;
 
-  pool.query(query, (err, rows) => {
+  if (!company || !region) {
+    return res.status(400).json({ error: "Company and region required" });
+  }
+
+const query = `
+  SELECT device_id, pitch, speed, fuel, fuel_consumption, timestamp
+  FROM (
+    SELECT rs.device_id, rs.pitch, rs.speed, rs.fuel, rs.fuel_consumption, rs.timestamp,
+           ROW_NUMBER() OVER (PARTITION BY rs.device_id ORDER BY rs.timestamp DESC) as rn
+    FROM realtime_sensor_data rs
+    JOIN devices d ON rs.device_id = d.device_id
+    JOIN regions r ON d.region_id = r.region_id
+    WHERE r.company_name = ? AND r.region_name = ?
+  ) t
+  WHERE rn <= 5
+  ORDER BY device_id, timestamp DESC
+`;
+
+  pool.query(query, [company, region.trim()], (err, rows) => {
     if (err) {
-      console.error('Error fetching last 10 z_axis per Hauler:', err);
-      return res.status(500).json({ error: "Error fetching z_axis values" });
+      console.error('Error fetching last values per Hauler:', err);
+      return res.status(500).json({ error: "Error fetching data" });
     }
 
     const haulerData = {};
+
     rows.forEach(row => {
       const equipment = row.device_id;
+
       if (!haulerData[equipment]) {
         haulerData[equipment] = [];
       }
+
       haulerData[equipment].push({
-        z_axis: Number(row.z_axis),
+        pitch: Number(row.pitch) || 0,
+        speed: Number(row.speed) || 0,
+        fuel: Number(row.fuel) || 0,
+        fuel_consumption: Number(row.fuel_consumption) || 0,
         timestamp: row.timestamp
       });
     });
@@ -1686,9 +1700,10 @@ if (timeRange === 'shift' && shift) {
     console.log(`🚀 Sending ${records.length} records to Python for analysis...`);
 
     // Call Python script
-    const pythonPath = '/opt/sample/venv/bin/python'; // ✅ venv python
+    //const pythonPath = '/opt/sample/venv/bin/python'; // ✅ venv python
 
-     const pythonProcess = exec(`${pythonPath} routes/analysis.py`, (error, stdout, stderr) => {
+     //const pythonProcess = exec(`${pythonPath} routes/analysis.py`, (error, stdout, stderr) => {
+      const pythonProcess = exec('python routes/analysis.py', (error, stdout, stderr) => {
       if (error) {
         console.error('❌ Python error:', error);
         return originalJson.call(res, { error: "Analysis failed: " + error.message });
