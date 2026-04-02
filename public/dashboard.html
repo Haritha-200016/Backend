@@ -1235,11 +1235,11 @@
 
     // ==================== DEVICE NAME MAPPING ====================
     const deviceDisplayNames = {
-      'D3': '25',
+      'D3': '28',
       'D7': '07',
-      'D8': '08',
+      'D8': '133',
       'D9': '09',
-      'D12': '12',
+      'D12': '95',
       'D14': '14'
     };
 
@@ -2755,6 +2755,7 @@ async function downloadReport(reportType, shift = null) {
                 <option value="D8">97</option>
                 <option value="D9">12</option>
                 <option value="D7">07</option>
+                <option value="D12">12</option>
                 <option value="D14">14</option>
                 <option value="all">All Haulers</option>
               </select>
@@ -3942,11 +3943,11 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
       console.trace('initializeDynamicMapSimulation called for region:', region);
 
       const deviceDisplayNames = {
-        'D3': '25',
-        'D8': '97',
+        'D3': '28',
+        'D8': '133',
         'D9': '12',
         'D7': '07',
-        'D12': '12',
+        'D12': '95',
         'D14': '14'
       };
 
