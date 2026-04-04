@@ -1235,11 +1235,11 @@
 
     // ==================== DEVICE NAME MAPPING ====================
     const deviceDisplayNames = {
-      'D3': '28',
+      'D3': '135',
       'D7': '07',
       'D8': '133',
-      'D9': '09',
-      'D12': '95',
+      'D9': '137',
+      'D12': '134',
       'D14': '14'
     };
 
@@ -1302,123 +1302,123 @@
       container.appendChild(buttonsContainer);
     }
 
-async function downloadReport(reportType, shift = null) {
-  const region_id = regionMapping[region] || 5;
+    async function downloadReport(reportType, shift = null) {
+      const region_id = regionMapping[region] || 5;
 
-  if (window.isDownloading) return;
+      if (window.isDownloading) return;
 
-  let message = `Generating ${reportType} report for ${region}...`;
-  if (reportType === 'shift') message = `Generating ${shift} shift report for ${region}...`;
+      let message = `Generating ${reportType} report for ${region}...`;
+      if (reportType === 'shift') message = `Generating ${shift} shift report for ${region}...`;
 
-  console.log(message);
-  showLoading(message);
+      console.log(message);
+      showLoading(message);
 
-  try {
-    window.isDownloading = true;
-
-    let url;
-    if (reportType === 'shift') {
-      url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
-    } else if (reportType === 'daily') {
-      url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=daily&region_id=${region_id}`;
-    } else if (reportType === 'monthly') {
-      url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
-    }
-
-    console.log(`📡 Fetching from: ${url}`);
-    const response = await fetch(url);
-
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-    const contentType = response.headers.get('content-type');
-
-    // ❌ If backend returns JSON error
-    if (contentType && contentType.includes('application/json')) {
-      const errorData = await response.json();
-      alert(`Analysis failed: ${errorData.error || 'Unknown error'}`);
-      return;
-    }
-
-    // ✅ Get file as array buffer
-    const buffer = await response.arrayBuffer();
-
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];
-
-    let filename = `Analysis_${region}_${reportType}`;
-    if (reportType === 'shift') filename += `_${shift}`;
-    filename += `_${dateStr}.xlsx`;
-
-    // ✅ Convert to base64 (for Flutter)
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-
-    const base64Data = btoa(binary);
-
-    // 📱 Flutter WebView support
-    if (typeof window.flutterDownload === "function") {
       try {
-        const ok = window.flutterDownload(
-          base64Data,
-          filename,
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        );
-        if (ok) {
-          console.log("✅ Flutter download success");
+        window.isDownloading = true;
+
+        let url;
+        if (reportType === 'shift') {
+          url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=shift&shift=${encodeURIComponent(shift)}&region_id=${region_id}`;
+        } else if (reportType === 'daily') {
+          url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=daily&region_id=${region_id}`;
+        } else if (reportType === 'monthly') {
+          url = `${BASE_URL}/generate-analysis?device_id=all&timeRange=monthly&region_id=${region_id}`;
+        }
+
+        console.log(`📡 Fetching from: ${url}`);
+        const response = await fetch(url);
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        const contentType = response.headers.get('content-type');
+
+        // ❌ If backend returns JSON error
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          alert(`Analysis failed: ${errorData.error || 'Unknown error'}`);
           return;
         }
-      } catch (e) {
-        console.error("Flutter download failed:", e);
+
+        // ✅ Get file as array buffer
+        const buffer = await response.arrayBuffer();
+
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+
+        let filename = `Analysis_${region}_${reportType}`;
+        if (reportType === 'shift') filename += `_${shift}`;
+        filename += `_${dateStr}.xlsx`;
+
+        // ✅ Convert to base64 (for Flutter)
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+
+        const base64Data = btoa(binary);
+
+        // 📱 Flutter WebView support
+        if (typeof window.flutterDownload === "function") {
+          try {
+            const ok = window.flutterDownload(
+              base64Data,
+              filename,
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            );
+            if (ok) {
+              console.log("✅ Flutter download success");
+              return;
+            }
+          } catch (e) {
+            console.error("Flutter download failed:", e);
+          }
+        }
+
+        // 📱 iOS fallback
+        if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+          const blob = new Blob([buffer], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          });
+
+          const url = window.URL.createObjectURL(blob);
+          const newWindow = window.open(url, '_blank');
+
+          if (!newWindow) {
+            alert('Please allow popups to download file');
+          }
+          return;
+        }
+
+        // 🌐 Normal browser
+        const blob = new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        });
+
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(downloadUrl);
+        }, 100);
+
+        console.log(`✅ Downloaded: ${filename}`);
+
+      } catch (error) {
+        console.error('Error generating analysis:', error);
+        alert(`Failed to generate analysis: ${error.message}`);
+      } finally {
+        window.isDownloading = false;
+        hideLoading();
       }
     }
-
-    // 📱 iOS fallback
-    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-      const blob = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      });
-
-      const url = window.URL.createObjectURL(blob);
-      const newWindow = window.open(url, '_blank');
-
-      if (!newWindow) {
-        alert('Please allow popups to download file');
-      }
-      return;
-    }
-
-    // 🌐 Normal browser
-    const blob = new Blob([buffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    });
-
-    const downloadUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(downloadUrl);
-    }, 100);
-
-    console.log(`✅ Downloaded: ${filename}`);
-
-  } catch (error) {
-    console.error('Error generating analysis:', error);
-    alert(`Failed to generate analysis: ${error.message}`);
-  } finally {
-    window.isDownloading = false;
-    hideLoading();
-  }
-}
     // Make functions globally available
     window.downloadReport = downloadReport;
     window.getDisplayName = getDisplayName;
@@ -1819,119 +1819,119 @@ async function downloadReport(reportType, shift = null) {
 
         // 🔹 Download (unchanged)
         async function downloadDumpReport(range = 'daily') {
-  console.log(`Downloading ${range} report...`);
+          console.log(`Downloading ${range} report...`);
 
-  if (window.isDownloading) return;
+          if (window.isDownloading) return;
 
-  const url = range === 'daily'
-    ? `${BASE_URL}/getAllDevices-DailyData?device_id=all&timeRange=daily&region_id=10`
-    : `${BASE_URL}/getAll-Devices-MonthlyData?device_id=all&timeRange=monthly&region_id=10`;
+          const url = range === 'daily'
+            ? `${BASE_URL}/getAllDevices-DailyData?device_id=all&timeRange=daily&region_id=10`
+            : `${BASE_URL}/getAll-Devices-MonthlyData?device_id=all&timeRange=monthly&region_id=10`;
 
-  const button = range === 'daily' ? dailyBtn : monthlyBtn;
-  const originalText = button.innerHTML;
+          const button = range === 'daily' ? dailyBtn : monthlyBtn;
+          const originalText = button.innerHTML;
 
-  try {
-    window.isDownloading = true;
-    button.innerHTML = '⏳ Loading...';
-    button.disabled = true;
+          try {
+            window.isDownloading = true;
+            button.innerHTML = '⏳ Loading...';
+            button.disabled = true;
 
-    const res = await fetch(url);
-    const json = await res.json();
+            const res = await fetch(url);
+            const json = await res.json();
 
-    button.innerHTML = originalText;
-    button.disabled = false;
+            button.innerHTML = originalText;
+            button.disabled = false;
 
-    if (!json.data || json.data.length === 0) {
-      alert('No data available');
-      return;
-    }
+            if (!json.data || json.data.length === 0) {
+              alert('No data available');
+              return;
+            }
 
-    // 📊 Prepare Excel
-    const wsData = [['Device ID', 'Count1', 'Timestamp']];
-    json.data.forEach(d =>
-      wsData.push([d.device_id, d.count1 ?? 0, d.timestamp])
-    );
+            // 📊 Prepare Excel
+            const wsData = [['Device ID', 'Count1', 'Timestamp']];
+            json.data.forEach(d =>
+              wsData.push([d.device_id, d.count1 ?? 0, d.timestamp])
+            );
 
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'DumpReport');
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'DumpReport');
 
-    const now = new Date();
-    const fileName = `Dump_${range}_${now.toISOString().split('T')[0]}.xlsx`;
+            const now = new Date();
+            const fileName = `Dump_${range}_${now.toISOString().split('T')[0]}.xlsx`;
 
-    // ✅ Generate formats
-    const base64Data = XLSX.write(wb, {
-      bookType: 'xlsx',
-      type: 'base64'
-    });
+            // ✅ Generate formats
+            const base64Data = XLSX.write(wb, {
+              bookType: 'xlsx',
+              type: 'base64'
+            });
 
-    const wbBuffer = XLSX.write(wb, {
-      bookType: 'xlsx',
-      type: 'array'
-    });
+            const wbBuffer = XLSX.write(wb, {
+              bookType: 'xlsx',
+              type: 'array'
+            });
 
-    // 📱 Flutter WebView
-    if (typeof window.flutterDownload === "function") {
-      try {
-        const ok = window.flutterDownload(
-          base64Data,
-          fileName,
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        );
-        if (ok) return;
-      } catch (e) {
-        console.error("Flutter download failed:", e);
-      }
-    }
+            // 📱 Flutter WebView
+            if (typeof window.flutterDownload === "function") {
+              try {
+                const ok = window.flutterDownload(
+                  base64Data,
+                  fileName,
+                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                );
+                if (ok) return;
+              } catch (e) {
+                console.error("Flutter download failed:", e);
+              }
+            }
 
-    // 📱 iOS Fix
-    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-      const blob = new Blob([wbBuffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      });
+            // 📱 iOS Fix
+            if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+              const blob = new Blob([wbBuffer], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              });
 
-      const url = window.URL.createObjectURL(blob);
-      const newWindow = window.open(url, '_blank');
+              const url = window.URL.createObjectURL(blob);
+              const newWindow = window.open(url, '_blank');
 
-      if (!newWindow) {
-        alert('Allow popups to download file');
-      }
-      return;
-    }
+              if (!newWindow) {
+                alert('Allow popups to download file');
+              }
+              return;
+            }
 
-    // 🌐 Normal browser
-    const blob = new Blob([wbBuffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    });
+            // 🌐 Normal browser
+            const blob = new Blob([wbBuffer], {
+              type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            });
 
-    const downloadUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = downloadUrl;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
+            const downloadUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = downloadUrl;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
 
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(downloadUrl);
-    }, 100);
+            setTimeout(() => {
+              document.body.removeChild(a);
+              URL.revokeObjectURL(downloadUrl);
+            }, 100);
 
-  } catch (err) {
-    console.error("Download error:", err);
-    button.innerHTML = originalText;
-    button.disabled = false;
-    alert("Download failed");
-  } finally {
-    window.isDownloading = false;
-  }
-}
+          } catch (err) {
+            console.error("Download error:", err);
+            button.innerHTML = originalText;
+            button.disabled = false;
+            alert("Download failed");
+          } finally {
+            window.isDownloading = false;
+          }
+        }
         dailyBtn.onclick = () => downloadDumpReport('daily');
         monthlyBtn.onclick = () => downloadDumpReport('monthly');
 
         fetchDumpValue();
         setInterval(fetchDumpValue, 30000);
       }
-      
+
       // ==================== DRONE STREAM PANEL ====================
       if (panelId === 'DroneStream') {
         container.innerHTML = `
@@ -2751,11 +2751,11 @@ async function downloadReport(reportType, shift = null) {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
               <strong style="color: #fff;">Hauler and Excavator Summary</strong>
               <select id="haulerSelector" style="background: #0a1920; color: #6ff3d6; border: 1px solid #6ff3d6; border-radius: 4px; padding: 4px 8px; font-size: 12px; font-weight: bold; cursor: pointer;">
-                <option value="D3">28</option>
+                <option value="D3">135</option>
                 <option value="D8">133</option>
-                <option value="D9">09</option>
+                <option value="D9">137</option>
                 <option value="D7">07</option>
-                <option value="D12">95</option>
+                <option value="D12">134</option>
                 <option value="D14">14</option>
                 <option value="all">All Haulers</option>
               </select>
@@ -3146,311 +3146,311 @@ async function downloadReport(reportType, shift = null) {
     }
 
     // ==================== FUEL CHART FUNCTIONS ====================
-async function renderFuelGradientForHauler(haulerId, forceRefresh = false) {
-  try {
-    const chartContainer = document.getElementById('fuelChartContainer');
-    const selectedHaulerFuelChart = document.getElementById('selectedHaulerFuelChart');
-    const fuelChartHaulerName = document.getElementById('fuelChartHaulerName');
-
-    if (!chartContainer || !selectedHaulerFuelChart) return;
-
-    const displayName = getDisplayName(haulerId);
-    selectedHaulerFuelChart.style.display = 'block';
-    if (fuelChartHaulerName) fuelChartHaulerName.textContent = `${haulerId === 'D7' ? 'Excavator' : 'Hauler'}: ${displayName}`;
-
-    // Show loading
-    chartContainer.innerHTML = '<div style="color: #6ff3d6; text-align: center; padding: 20px;">Loading fuel data...</div>';
-
-    // FETCH FROM Z-AXIS API INSTEAD OF fetchData()
-    const response = await fetch(`${BASE_URL}/api/get_last_10_zaxis?company=${encodeURIComponent(company)}&sector=${encodeURIComponent(sector)}&region=${encodeURIComponent(region)}`);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
-    const haulerData = await response.json();
-    
-    if (!haulerData || Object.keys(haulerData).length === 0) {
-      throw new Error('No data available from API');
-    }
-    
-    // Filter data for this hauler
-    const haulerRecords = haulerData[haulerId];
-    
-    if (!haulerRecords || haulerRecords.length === 0) {
-      chartContainer.innerHTML = `<div style="color: #ccc; text-align: center; padding: 20px;">No data for ${displayName}</div>`;
-      return;
-    }
-    
-    // Get last 10 records (sorted by timestamp)
-    const records = [...haulerRecords].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10).reverse();
-    
-    // Extract data from backend
-    const timestamps = records.map(r => r.timestamp);
-    const pitchValues = records.map(r => parseFloat(r.pitch) || 0);
-    
-    // USE BACKEND FUEL VALUES IF AVAILABLE, OTHERWISE CALCULATE
-    // Check if backend has fuel_consumption field
-    /*const fuelValues = records.map(r => {
-      if (r.fuel_consumption) {
-        return parseFloat(r.fuel_consumption);
-      } else {
-        // Fallback calculation if backend doesn't provide fuel
-        const baselineKmpl = haulerId === 'D7' ? 0.8 : 1.5;
-        const FC0 = 100 * baselineKmpl;
-        return FC0 * (1 + 0.1 * Math.sin((parseFloat(r.pitch) || 0) * Math.PI / 180));
-      }
-    });*/
-    const fuelValues = records.map(r => parseFloat(r.fuel_consumption) || 0);
-
-    // Format timestamps for display
-    const labels = timestamps.map(t => {
+    async function renderFuelGradientForHauler(haulerId, forceRefresh = false) {
       try {
-        const d = new Date(t);
-        return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
-      } catch {
-        return t;
-      }
-    });
+        const chartContainer = document.getElementById('fuelChartContainer');
+        const selectedHaulerFuelChart = document.getElementById('selectedHaulerFuelChart');
+        const fuelChartHaulerName = document.getElementById('fuelChartHaulerName');
 
-    // Colors based on hauler type
-    const colors = {
-      'D7': { fuel: '#FF5722', gradient: '#FF9800' },
-      'D3': { fuel: '#2196F3', gradient: '#64B5F6' },
-      'D8': { fuel: '#4CAF50', gradient: '#81C784' },
-      'D9': { fuel: '#9C27B0', gradient: '#BA68C8' },
-      'D12': { fuel: '#FF9F40', gradient: '#FFB74D' },
-      'D14': { fuel: '#9C27B0', gradient: '#BA68C8' },
-      'default': { fuel: '#36a2eb', gradient: '#32cd32' }
-    };
+        if (!chartContainer || !selectedHaulerFuelChart) return;
 
-    const colorSet = colors[haulerId] || colors.default;
+        const displayName = getDisplayName(haulerId);
+        selectedHaulerFuelChart.style.display = 'block';
+        if (fuelChartHaulerName) fuelChartHaulerName.textContent = `${haulerId === 'D7' ? 'Excavator' : 'Hauler'}: ${displayName}`;
 
-    // Clear loading and create chart
-    chartContainer.innerHTML = '';
-    const canvas = document.createElement('canvas');
-    canvas.id = `fuel-chart-${Date.now()}`;
-    canvas.height = 180;
-    chartContainer.appendChild(canvas);
+        // Show loading
+        chartContainer.innerHTML = '<div style="color: #6ff3d6; text-align: center; padding: 20px;">Loading fuel data...</div>';
 
-    new Chart(canvas.getContext('2d'), {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: `Fuel - ${displayName}`,
-            data: fuelValues,
-            borderColor: colorSet.fuel,
-            backgroundColor: colorSet.fuel + '20',
-            tension: 0.3,
-            fill: false,
-            borderWidth: 2,
-            pointRadius: 3
-          },
-          {
-            label: `Pitch - ${displayName}`,
-            data: pitchValues,
-            borderColor: colorSet.gradient,
-            backgroundColor: colorSet.gradient + '20',
-            tension: 0.3,
-            fill: false,
-            borderWidth: 2,
-            pointRadius: 3,
-            yAxisID: 'y1'
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: true,
-            position: 'top',
-            labels: { color: '#ccc', font: { size: 10 } }
-          },
-          tooltip: {
-            mode: 'index',
-            intersect: false,
-            callbacks: {
-              label: function (context) {
-                if (context.datasetIndex === 0) {
-                  return `Fuel: ${context.raw.toFixed(1)} L/100km`;
-                } else {
-                  return `Pitch: ${context.raw}°`;
-                }
-              }
-            }
-          }
-        },
-        scales: {
-          x: {
-            ticks: { color: '#ccc', font: { size: 10 }, maxRotation: 45, minRotation: 45 },
-            grid: { color: '#1e3a47' }
-          },
-          y: {
-            title: { display: true, text: 'Fuel (L/100km)', color: colorSet.fuel, font: { size: 11 } },
-            ticks: { color: '#ccc' },
-            grid: { color: '#1e3a47' }
-          },
-          y1: {
-            position: 'right',
-            title: { display: true, text: 'Pitch Angle (°)', color: colorSet.gradient, font: { size: 11 } },
-            ticks: { color: colorSet.gradient },
-            grid: { drawOnChartArea: false }
-          }
+        // FETCH FROM Z-AXIS API INSTEAD OF fetchData()
+        const response = await fetch(`${BASE_URL}/api/get_last_10_zaxis?company=${encodeURIComponent(company)}&sector=${encodeURIComponent(sector)}&region=${encodeURIComponent(region)}`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
         }
-      }
-    });
 
-  } catch (err) {
-    console.error('Error rendering fuel chart:', err);
-    const chartContainer = document.getElementById('fuelChartContainer');
-    if (chartContainer) {
-      chartContainer.innerHTML = '<div style="color: #ff4444; text-align: center; padding: 20px;">Error loading fuel data</div>';
-    }
-  }
-}
+        const haulerData = await response.json();
 
-
-async function renderAllHaulersFuelChart(forceRefresh = false) {
-  try {
-    const chartContainer = document.getElementById('fuelChartContainer');
-    const selectedHaulerFuelChart = document.getElementById('selectedHaulerFuelChart');
-    const fuelChartHaulerName = document.getElementById('fuelChartHaulerName');
-
-    if (!chartContainer || !selectedHaulerFuelChart) return;
-
-    selectedHaulerFuelChart.style.display = 'block';
-    if (fuelChartHaulerName) fuelChartHaulerName.textContent = 'All Vehicles - Fuel Comparison';
-
-    chartContainer.innerHTML = '<div style="color: #6ff3d6; text-align: center; padding: 20px;">Loading fuel data...</div>';
-
-    // FETCH FROM Z-AXIS API
-    const response = await fetch(`${BASE_URL}/api/get_last_10_zaxis?company=${encodeURIComponent(company)}&sector=${encodeURIComponent(sector)}&region=${encodeURIComponent(region)}`);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
-    const haulerData = await response.json();
-    
-    if (!haulerData || Object.keys(haulerData).length === 0) {
-      throw new Error('No data available');
-    }
-    
-    // Get all haulers with data
-    const haulers = ['D3', 'D7', 'D8', 'D9', 'D12', 'D14'].filter(id => haulerData[id] && haulerData[id].length > 0);
-    
-    if (haulers.length === 0) {
-      chartContainer.innerHTML = '<div style="color: #ccc; text-align: center; padding: 20px;">No vehicle data available</div>';
-      return;
-    }
-    
-    const datasets = [];
-    const colors = {
-      'D3': '#2196F3', 'D7': '#FF5722', 'D8': '#4CAF50', 'D9': '#9C27B0', 'D12': '#FF9F40', 'D14': '#9C27B0'
-    };
-    
-    let allLabels = [];
-    
-    haulers.forEach(hauler => {
-      const records = [...haulerData[hauler]].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10).reverse();
-      
-      const timestamps = records.map(r => r.timestamp);
-      const pitchValues = records.map(r => parseFloat(r.pitch) || 0);
-      
-      // Use backend fuel values if available
-      /*const fuelValues = records.map(r => {
-        if (r.fuel_consumption) {
-          return parseFloat(r.fuel_consumption);
-        } else {
-          const baselineKmpl = hauler === 'D7' ? 0.8 : 1.5;
-          const FC0 = 100 * baselineKmpl;
-          return FC0 * (1 + 0.1 * Math.sin((parseFloat(r.z_axis) || 0) * Math.PI / 180));
+        if (!haulerData || Object.keys(haulerData).length === 0) {
+          throw new Error('No data available from API');
         }
-      });*/
-      const fuelValues = records.map(r => parseFloat(r.fuel_consumption) || 0);
-      
-      if (allLabels.length === 0) {
-        allLabels = timestamps.map(t => {
+
+        // Filter data for this hauler
+        const haulerRecords = haulerData[haulerId];
+
+        if (!haulerRecords || haulerRecords.length === 0) {
+          chartContainer.innerHTML = `<div style="color: #ccc; text-align: center; padding: 20px;">No data for ${displayName}</div>`;
+          return;
+        }
+
+        // Get last 10 records (sorted by timestamp)
+        const records = [...haulerRecords].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10).reverse();
+
+        // Extract data from backend
+        const timestamps = records.map(r => r.timestamp);
+        const pitchValues = records.map(r => parseFloat(r.pitch) || 0);
+
+        // USE BACKEND FUEL VALUES IF AVAILABLE, OTHERWISE CALCULATE
+        // Check if backend has fuel_consumption field
+        /*const fuelValues = records.map(r => {
+          if (r.fuel_consumption) {
+            return parseFloat(r.fuel_consumption);
+          } else {
+            // Fallback calculation if backend doesn't provide fuel
+            const baselineKmpl = haulerId === 'D7' ? 0.8 : 1.5;
+            const FC0 = 100 * baselineKmpl;
+            return FC0 * (1 + 0.1 * Math.sin((parseFloat(r.pitch) || 0) * Math.PI / 180));
+          }
+        });*/
+        const fuelValues = records.map(r => parseFloat(r.fuel_consumption) || 0);
+
+        // Format timestamps for display
+        const labels = timestamps.map(t => {
           try {
             const d = new Date(t);
-            return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+            return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
           } catch {
             return t;
           }
         });
-      }
-      
-      const labelPrefix = hauler === 'D7' ? 'Excavator' : 'Hauler';
-      const displayName = getDisplayName(hauler);
-      
-      datasets.push({
-        label: `${labelPrefix} ${displayName}`,
-        data: fuelValues,
-        borderColor: colors[hauler] || '#666666',
-        backgroundColor: (colors[hauler] || '#666666') + '20',
-        tension: 0.3,
-        fill: false,
-        borderWidth: 2,
-        pointRadius: 3
-      });
-    });
-    
-    chartContainer.innerHTML = '';
-    const canvas = document.createElement('canvas');
-    canvas.id = `all-chart-${Date.now()}`;
-    canvas.height = 180;
-    chartContainer.appendChild(canvas);
-    
-    new Chart(canvas.getContext('2d'), {
-      type: 'line',
-      data: {
-        labels: allLabels,
-        datasets: datasets
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: true,
-            position: 'top',
-            labels: { color: '#ccc', font: { size: 9 } }
+
+        // Colors based on hauler type
+        const colors = {
+          'D7': { fuel: '#FF5722', gradient: '#FF9800' },
+          'D3': { fuel: '#2196F3', gradient: '#64B5F6' },
+          'D8': { fuel: '#4CAF50', gradient: '#81C784' },
+          'D9': { fuel: '#9C27B0', gradient: '#BA68C8' },
+          'D12': { fuel: '#FF9F40', gradient: '#FFB74D' },
+          'D14': { fuel: '#9C27B0', gradient: '#BA68C8' },
+          'default': { fuel: '#36a2eb', gradient: '#32cd32' }
+        };
+
+        const colorSet = colors[haulerId] || colors.default;
+
+        // Clear loading and create chart
+        chartContainer.innerHTML = '';
+        const canvas = document.createElement('canvas');
+        canvas.id = `fuel-chart-${Date.now()}`;
+        canvas.height = 180;
+        chartContainer.appendChild(canvas);
+
+        new Chart(canvas.getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: `Fuel - ${displayName}`,
+                data: fuelValues,
+                borderColor: colorSet.fuel,
+                backgroundColor: colorSet.fuel + '20',
+                tension: 0.3,
+                fill: false,
+                borderWidth: 2,
+                pointRadius: 3
+              },
+              {
+                label: `Pitch - ${displayName}`,
+                data: pitchValues,
+                borderColor: colorSet.gradient,
+                backgroundColor: colorSet.gradient + '20',
+                tension: 0.3,
+                fill: false,
+                borderWidth: 2,
+                pointRadius: 3,
+                yAxisID: 'y1'
+              }
+            ]
           },
-          tooltip: {
-            mode: 'index',
-            intersect: false
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top',
+                labels: { color: '#ccc', font: { size: 10 } }
+              },
+              tooltip: {
+                mode: 'index',
+                intersect: false,
+                callbacks: {
+                  label: function (context) {
+                    if (context.datasetIndex === 0) {
+                      return `Fuel: ${context.raw.toFixed(1)} L/100km`;
+                    } else {
+                      return `Pitch: ${context.raw}°`;
+                    }
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                ticks: { color: '#ccc', font: { size: 10 }, maxRotation: 45, minRotation: 45 },
+                grid: { color: '#1e3a47' }
+              },
+              y: {
+                title: { display: true, text: 'Fuel (L/100km)', color: colorSet.fuel, font: { size: 11 } },
+                ticks: { color: '#ccc' },
+                grid: { color: '#1e3a47' }
+              },
+              y1: {
+                position: 'right',
+                title: { display: true, text: 'Pitch Angle (°)', color: colorSet.gradient, font: { size: 11 } },
+                ticks: { color: colorSet.gradient },
+                grid: { drawOnChartArea: false }
+              }
+            }
           }
-        },
-        scales: {
-          x: {
-            ticks: { color: '#ccc' },
-            grid: { color: '#1e3a47' }
-          },
-          y: {
-            title: { display: true, text: 'Fuel (L/100km)', color: '#ccc' },
-            ticks: { color: '#ccc' },
-            grid: { color: '#1e3a47' }
-          }
+        });
+
+      } catch (err) {
+        console.error('Error rendering fuel chart:', err);
+        const chartContainer = document.getElementById('fuelChartContainer');
+        if (chartContainer) {
+          chartContainer.innerHTML = '<div style="color: #ff4444; text-align: center; padding: 20px;">Error loading fuel data</div>';
         }
       }
-    });
-    
-  } catch (err) {
-    console.error('Error rendering all haulers chart:', err);
-    const chartContainer = document.getElementById('fuelChartContainer');
-    if (chartContainer) {
-      chartContainer.innerHTML = '<div style="color: #ff4444; text-align: center; padding: 20px;">Error loading data</div>';
     }
-  }
-}
-    
 
 
-async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
+    async function renderAllHaulersFuelChart(forceRefresh = false) {
+      try {
+        const chartContainer = document.getElementById('fuelChartContainer');
+        const selectedHaulerFuelChart = document.getElementById('selectedHaulerFuelChart');
+        const fuelChartHaulerName = document.getElementById('fuelChartHaulerName');
+
+        if (!chartContainer || !selectedHaulerFuelChart) return;
+
+        selectedHaulerFuelChart.style.display = 'block';
+        if (fuelChartHaulerName) fuelChartHaulerName.textContent = 'All Vehicles - Fuel Comparison';
+
+        chartContainer.innerHTML = '<div style="color: #6ff3d6; text-align: center; padding: 20px;">Loading fuel data...</div>';
+
+        // FETCH FROM Z-AXIS API
+        const response = await fetch(`${BASE_URL}/api/get_last_10_zaxis?company=${encodeURIComponent(company)}&sector=${encodeURIComponent(sector)}&region=${encodeURIComponent(region)}`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const haulerData = await response.json();
+
+        if (!haulerData || Object.keys(haulerData).length === 0) {
+          throw new Error('No data available');
+        }
+
+        // Get all haulers with data
+        const haulers = ['D3', 'D7', 'D8', 'D9', 'D12', 'D14'].filter(id => haulerData[id] && haulerData[id].length > 0);
+
+        if (haulers.length === 0) {
+          chartContainer.innerHTML = '<div style="color: #ccc; text-align: center; padding: 20px;">No vehicle data available</div>';
+          return;
+        }
+
+        const datasets = [];
+        const colors = {
+          'D3': '#2196F3', 'D7': '#FF5722', 'D8': '#4CAF50', 'D9': '#9C27B0', 'D12': '#FF9F40', 'D14': '#9C27B0'
+        };
+
+        let allLabels = [];
+
+        haulers.forEach(hauler => {
+          const records = [...haulerData[hauler]].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10).reverse();
+
+          const timestamps = records.map(r => r.timestamp);
+          const pitchValues = records.map(r => parseFloat(r.pitch) || 0);
+
+          // Use backend fuel values if available
+          /*const fuelValues = records.map(r => {
+            if (r.fuel_consumption) {
+              return parseFloat(r.fuel_consumption);
+            } else {
+              const baselineKmpl = hauler === 'D7' ? 0.8 : 1.5;
+              const FC0 = 100 * baselineKmpl;
+              return FC0 * (1 + 0.1 * Math.sin((parseFloat(r.z_axis) || 0) * Math.PI / 180));
+            }
+          });*/
+          const fuelValues = records.map(r => parseFloat(r.fuel_consumption) || 0);
+
+          if (allLabels.length === 0) {
+            allLabels = timestamps.map(t => {
+              try {
+                const d = new Date(t);
+                return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+              } catch {
+                return t;
+              }
+            });
+          }
+
+          const labelPrefix = hauler === 'D7' ? 'Excavator' : 'Hauler';
+          const displayName = getDisplayName(hauler);
+
+          datasets.push({
+            label: `${labelPrefix} ${displayName}`,
+            data: fuelValues,
+            borderColor: colors[hauler] || '#666666',
+            backgroundColor: (colors[hauler] || '#666666') + '20',
+            tension: 0.3,
+            fill: false,
+            borderWidth: 2,
+            pointRadius: 3
+          });
+        });
+
+        chartContainer.innerHTML = '';
+        const canvas = document.createElement('canvas');
+        canvas.id = `all-chart-${Date.now()}`;
+        canvas.height = 180;
+        chartContainer.appendChild(canvas);
+
+        new Chart(canvas.getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: allLabels,
+            datasets: datasets
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top',
+                labels: { color: '#ccc', font: { size: 9 } }
+              },
+              tooltip: {
+                mode: 'index',
+                intersect: false
+              }
+            },
+            scales: {
+              x: {
+                ticks: { color: '#ccc' },
+                grid: { color: '#1e3a47' }
+              },
+              y: {
+                title: { display: true, text: 'Fuel (L/100km)', color: '#ccc' },
+                ticks: { color: '#ccc' },
+                grid: { color: '#1e3a47' }
+              }
+            }
+          }
+        });
+
+      } catch (err) {
+        console.error('Error rendering all haulers chart:', err);
+        const chartContainer = document.getElementById('fuelChartContainer');
+        if (chartContainer) {
+          chartContainer.innerHTML = '<div style="color: #ff4444; text-align: center; padding: 20px;">Error loading data</div>';
+        }
+      }
+    }
+
+
+
+    async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
       try {
         const chartContainer = document.getElementById('fuelVsSpeedContainer');
         const fuelVsSpeedChartDiv = document.getElementById('fuelVsSpeedChart');
@@ -3528,7 +3528,7 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
 
 
 
-//const speedValues = records.map(r => parseFloat(r.speed) || 0);
+        //const speedValues = records.map(r => parseFloat(r.speed) || 0);
         // Fuel consumption calculation (L/100km) based on pitch and speed
         const baselineKmpl = isExcavator ? 0.8 : 1.5;
         /*const fuelValues = pitchValues.map((pitch, index) => {
@@ -3645,8 +3645,147 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
     }
 
 
-    
-   /* async function renderAllHaulersFuelVsSpeed(forceRefresh = false) {
+
+    /* async function renderAllHaulersFuelVsSpeed(forceRefresh = false) {
+       try {
+         const chartContainer = document.getElementById('fuelVsSpeedContainer');
+         const fuelVsSpeedChartDiv = document.getElementById('fuelVsSpeedChart');
+         const speedChartHaulerName = document.getElementById('speedChartHaulerName');
+ 
+         if (!chartContainer || !fuelVsSpeedChartDiv) return;
+ 
+         fuelVsSpeedChartDiv.style.display = 'block';
+         if (speedChartHaulerName) speedChartHaulerName.textContent = 'All Vehicles - Fuel vs Speed Comparison';
+ 
+         chartContainer.innerHTML = '<div style="color: #6ff3d6; text-align: center; padding: 20px;">Loading fuel vs speed data...</div>';
+ 
+         // Fetch last 10 records from backend API
+         const response = await fetch(`${BASE_URL}/api/get_last_10_zaxis?company=${encodeURIComponent(company)}&sector=${encodeURIComponent(sector)}&region=${encodeURIComponent(region)}`);
+ 
+         if (!response.ok) {
+           throw new Error(`HTTP ${response.status}`);
+         }
+ 
+         const haulerData = await response.json();
+ 
+         if (!haulerData || Object.keys(haulerData).length === 0) {
+           throw new Error('No data available');
+         }
+ 
+         // Group by device_id and prepare datasets
+         const haulers = ['D3', 'D7', 'D8', 'D9', 'D12', 'D14'].filter(id => haulerData[id] && haulerData[id].length > 0);
+ 
+         if (haulers.length === 0) {
+           chartContainer.innerHTML = '<div style="color: #ccc; text-align: center; padding: 20px;">No vehicle data available</div>';
+           return;
+         }
+ 
+         const datasets = [];
+         const colors = {
+           'D3': '#2196F3', 'D7': '#FF5722', 'D8': '#4CAF50', 'D9': '#9C27B0', 'D12': '#FF9F40', 'D14': '#9C27B0'
+         };
+ 
+         let allLabels = [];
+ 
+         haulers.forEach(hauler => {
+           const records = haulerData[hauler].slice(0, 10).reverse();
+ 
+           const timestamps = records.map(r => {
+             try {
+               const d = new Date(r.timestamp);
+               return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+             } catch {
+               return r.timestamp;
+             }
+           });
+ 
+           const pitchValues = records.map(r => parseFloat(r.z_axis) || 0);
+ 
+           if (allLabels.length === 0) {
+             allLabels = timestamps;
+           }
+ 
+           const isExcavator = hauler === 'D7';
+           const baselineKmpl = isExcavator ? 0.8 : 1.5;
+           const FC0 = 100 * baselineKmpl;
+ 
+           // Calculate fuel consumption
+           const fuelValues = pitchValues.map(p => FC0 * (1 + 0.1 * Math.sin(p * Math.PI / 180)));
+ 
+           const labelPrefix = isExcavator ? 'Excavator' : 'Hauler';
+           const displayName = getDisplayName(hauler);
+ 
+           datasets.push({
+             label: `${labelPrefix} ${displayName} (Fuel)`,
+             data: fuelValues,
+             borderColor: colors[hauler] || '#666666',
+             backgroundColor: (colors[hauler] || '#666666') + '20',
+             tension: 0.3,
+             fill: false,
+             borderWidth: 2,
+             pointRadius: 3
+           });
+         });
+ 
+         chartContainer.innerHTML = '';
+         const canvas = document.createElement('canvas');
+         canvas.id = `all-fuel-speed-chart-${Date.now()}`;
+         canvas.height = 180;
+         chartContainer.appendChild(canvas);
+ 
+         new Chart(canvas.getContext('2d'), {
+           type: 'line',
+           data: {
+             labels: allLabels,
+             datasets: datasets
+           },
+           options: {
+             responsive: true,
+             maintainAspectRatio: false,
+             plugins: {
+               legend: {
+                 display: true,
+                 position: 'top',
+                 labels: { color: '#ccc', font: { size: 9 } }
+               },
+               tooltip: {
+                 mode: 'index',
+                 intersect: false,
+                 callbacks: {
+                   label: function (context) {
+                     return `${context.dataset.label}: ${context.raw.toFixed(1)} L/100km`;
+                   }
+                 }
+               }
+             },
+             scales: {
+               x: {
+                 ticks: { color: '#ccc' },
+                 grid: { color: '#1e3a47' }
+               },
+               y: {
+                 title: { display: true, text: 'Fuel Consumption (L/100km)', color: '#ccc' },
+                 ticks: { color: '#ccc' },
+                 grid: { color: '#1e3a47' }
+               }
+             }
+           }
+         });
+ 
+       } catch (err) {
+         console.error('Error rendering all haulers fuel vs speed chart:', err);
+         const chartContainer = document.getElementById('fuelVsSpeedContainer');
+         if (chartContainer) {
+           chartContainer.innerHTML = '<div style="color: #ff4444; text-align: center; padding: 20px;">Error loading data</div>';
+         }
+       }
+     }
+    */
+
+
+
+
+    async function renderAllHaulersFuelVsSpeed(forceRefresh = false) {
       try {
         const chartContainer = document.getElementById('fuelVsSpeedContainer');
         const fuelVsSpeedChartDiv = document.getElementById('fuelVsSpeedChart');
@@ -3655,16 +3794,19 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
         if (!chartContainer || !fuelVsSpeedChartDiv) return;
 
         fuelVsSpeedChartDiv.style.display = 'block';
-        if (speedChartHaulerName) speedChartHaulerName.textContent = 'All Vehicles - Fuel vs Speed Comparison';
-
-        chartContainer.innerHTML = '<div style="color: #6ff3d6; text-align: center; padding: 20px;">Loading fuel vs speed data...</div>';
-
-        // Fetch last 10 records from backend API
-        const response = await fetch(`${BASE_URL}/api/get_last_10_zaxis?company=${encodeURIComponent(company)}&sector=${encodeURIComponent(sector)}&region=${encodeURIComponent(region)}`);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+        if (speedChartHaulerName) {
+          speedChartHaulerName.textContent = 'All Vehicles - Fuel vs Speed Comparison';
         }
+
+        chartContainer.innerHTML =
+          '<div style="color: #6ff3d6; text-align: center; padding: 20px;">Loading fuel vs speed data...</div>';
+
+        // API CALL
+        const response = await fetch(
+          `${BASE_URL}/api/get_last_10_zaxis?company=${encodeURIComponent(company)}&sector=${encodeURIComponent(sector)}&region=${encodeURIComponent(region)}`
+        );
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const haulerData = await response.json();
 
@@ -3672,17 +3814,24 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
           throw new Error('No data available');
         }
 
-        // Group by device_id and prepare datasets
-        const haulers = ['D3', 'D7', 'D8', 'D9', 'D12', 'D14'].filter(id => haulerData[id] && haulerData[id].length > 0);
+        // Haulers
+        const haulers = ['D3', 'D7', 'D8', 'D9', 'D12', 'D14']
+          .filter(id => haulerData[id] && haulerData[id].length > 0);
 
         if (haulers.length === 0) {
-          chartContainer.innerHTML = '<div style="color: #ccc; text-align: center; padding: 20px;">No vehicle data available</div>';
+          chartContainer.innerHTML =
+            '<div style="color: #ccc; text-align: center; padding: 20px;">No vehicle data available</div>';
           return;
         }
 
         const datasets = [];
         const colors = {
-          'D3': '#2196F3', 'D7': '#FF5722', 'D8': '#4CAF50', 'D9': '#9C27B0', 'D12': '#FF9F40', 'D14': '#9C27B0'
+          'D3': '#2196F3',
+          'D7': '#FF5722',
+          'D8': '#4CAF50',
+          'D9': '#9C27B0',
+          'D12': '#FF9F40',
+          'D14': '#795548'
         };
 
         let allLabels = [];
@@ -3690,33 +3839,22 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
         haulers.forEach(hauler => {
           const records = haulerData[hauler].slice(0, 10).reverse();
 
-          const timestamps = records.map(r => {
-            try {
-              const d = new Date(r.timestamp);
-              return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
-            } catch {
-              return r.timestamp;
-            }
-          });
+          // ✅ X = SPEED
+          const speedValues = records.map(r => parseFloat(r.speed) || 0);
 
-          const pitchValues = records.map(r => parseFloat(r.z_axis) || 0);
+          // ✅ Y = FUEL (from backend)
+          const fuelValues = records.map(r => parseFloat(r.fuel_consumption) || 0);
 
+          // Use first hauler speeds as labels
           if (allLabels.length === 0) {
-            allLabels = timestamps;
+            allLabels = speedValues;
           }
 
-          const isExcavator = hauler === 'D7';
-          const baselineKmpl = isExcavator ? 0.8 : 1.5;
-          const FC0 = 100 * baselineKmpl;
-
-          // Calculate fuel consumption
-          const fuelValues = pitchValues.map(p => FC0 * (1 + 0.1 * Math.sin(p * Math.PI / 180)));
-
-          const labelPrefix = isExcavator ? 'Excavator' : 'Hauler';
+          const labelPrefix = hauler === 'D7' ? 'Excavator' : 'Hauler';
           const displayName = getDisplayName(hauler);
 
           datasets.push({
-            label: `${labelPrefix} ${displayName} (Fuel)`,
+            label: `${labelPrefix} ${displayName}`,
             data: fuelValues,
             borderColor: colors[hauler] || '#666666',
             backgroundColor: (colors[hauler] || '#666666') + '20',
@@ -3727,16 +3865,16 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
           });
         });
 
+        // Create chart
         chartContainer.innerHTML = '';
         const canvas = document.createElement('canvas');
-        canvas.id = `all-fuel-speed-chart-${Date.now()}`;
         canvas.height = 180;
         chartContainer.appendChild(canvas);
 
         new Chart(canvas.getContext('2d'), {
-          type: 'line',
+          type: 'line', // same style
           data: {
-            labels: allLabels,
+            labels: allLabels, // ✅ SPEED on X-axis
             datasets: datasets
           },
           options: {
@@ -3752,6 +3890,9 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
                 mode: 'index',
                 intersect: false,
                 callbacks: {
+                  title: function (context) {
+                    return `Speed: ${context[0].label} km/h`;
+                  },
                   label: function (context) {
                     return `${context.dataset.label}: ${context.raw.toFixed(1)} L/100km`;
                   }
@@ -3760,11 +3901,20 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
             },
             scales: {
               x: {
+                title: {
+                  display: true,
+                  text: 'Speed (km/h)', // ✅ fixed
+                  color: '#ccc'
+                },
                 ticks: { color: '#ccc' },
                 grid: { color: '#1e3a47' }
               },
               y: {
-                title: { display: true, text: 'Fuel Consumption (L/100km)', color: '#ccc' },
+                title: {
+                  display: true,
+                  text: 'Fuel Consumption (L/100km)',
+                  color: '#ccc'
+                },
                 ticks: { color: '#ccc' },
                 grid: { color: '#1e3a47' }
               }
@@ -3774,165 +3924,15 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
 
       } catch (err) {
         console.error('Error rendering all haulers fuel vs speed chart:', err);
+
         const chartContainer = document.getElementById('fuelVsSpeedContainer');
         if (chartContainer) {
-          chartContainer.innerHTML = '<div style="color: #ff4444; text-align: center; padding: 20px;">Error loading data</div>';
+          chartContainer.innerHTML =
+            '<div style="color: #ff4444; text-align: center; padding: 20px;">Error loading data</div>';
         }
       }
     }
-   */
 
-   
-
-
-   async function renderAllHaulersFuelVsSpeed(forceRefresh = false) {
-  try {
-    const chartContainer = document.getElementById('fuelVsSpeedContainer');
-    const fuelVsSpeedChartDiv = document.getElementById('fuelVsSpeedChart');
-    const speedChartHaulerName = document.getElementById('speedChartHaulerName');
-
-    if (!chartContainer || !fuelVsSpeedChartDiv) return;
-
-    fuelVsSpeedChartDiv.style.display = 'block';
-    if (speedChartHaulerName) {
-      speedChartHaulerName.textContent = 'All Vehicles - Fuel vs Speed Comparison';
-    }
-
-    chartContainer.innerHTML =
-      '<div style="color: #6ff3d6; text-align: center; padding: 20px;">Loading fuel vs speed data...</div>';
-
-    // API CALL
-    const response = await fetch(
-      `${BASE_URL}/api/get_last_10_zaxis?company=${encodeURIComponent(company)}&sector=${encodeURIComponent(sector)}&region=${encodeURIComponent(region)}`
-    );
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-    const haulerData = await response.json();
-
-    if (!haulerData || Object.keys(haulerData).length === 0) {
-      throw new Error('No data available');
-    }
-
-    // Haulers
-    const haulers = ['D3', 'D7', 'D8', 'D9', 'D12', 'D14']
-      .filter(id => haulerData[id] && haulerData[id].length > 0);
-
-    if (haulers.length === 0) {
-      chartContainer.innerHTML =
-        '<div style="color: #ccc; text-align: center; padding: 20px;">No vehicle data available</div>';
-      return;
-    }
-
-    const datasets = [];
-    const colors = {
-      'D3': '#2196F3',
-      'D7': '#FF5722',
-      'D8': '#4CAF50',
-      'D9': '#9C27B0',
-      'D12': '#FF9F40',
-      'D14': '#795548'
-    };
-
-    let allLabels = [];
-
-    haulers.forEach(hauler => {
-      const records = haulerData[hauler].slice(0, 10).reverse();
-
-      // ✅ X = SPEED
-      const speedValues = records.map(r => parseFloat(r.speed) || 0);
-
-      // ✅ Y = FUEL (from backend)
-      const fuelValues = records.map(r => parseFloat(r.fuel_consumption) || 0);
-
-      // Use first hauler speeds as labels
-      if (allLabels.length === 0) {
-        allLabels = speedValues;
-      }
-
-      const labelPrefix = hauler === 'D7' ? 'Excavator' : 'Hauler';
-      const displayName = getDisplayName(hauler);
-
-      datasets.push({
-        label: `${labelPrefix} ${displayName}`,
-        data: fuelValues,
-        borderColor: colors[hauler] || '#666666',
-        backgroundColor: (colors[hauler] || '#666666') + '20',
-        tension: 0.3,
-        fill: false,
-        borderWidth: 2,
-        pointRadius: 3
-      });
-    });
-
-    // Create chart
-    chartContainer.innerHTML = '';
-    const canvas = document.createElement('canvas');
-    canvas.height = 180;
-    chartContainer.appendChild(canvas);
-
-    new Chart(canvas.getContext('2d'), {
-      type: 'line', // same style
-      data: {
-        labels: allLabels, // ✅ SPEED on X-axis
-        datasets: datasets
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: true,
-            position: 'top',
-            labels: { color: '#ccc', font: { size: 9 } }
-          },
-          tooltip: {
-            mode: 'index',
-            intersect: false,
-            callbacks: {
-              title: function (context) {
-                return `Speed: ${context[0].label} km/h`;
-              },
-              label: function (context) {
-                return `${context.dataset.label}: ${context.raw.toFixed(1)} L/100km`;
-              }
-            }
-          }
-        },
-        scales: {
-          x: {
-            title: {
-              display: true,
-              text: 'Speed (km/h)', // ✅ fixed
-              color: '#ccc'
-            },
-            ticks: { color: '#ccc' },
-            grid: { color: '#1e3a47' }
-          },
-          y: {
-            title: {
-              display: true,
-              text: 'Fuel Consumption (L/100km)',
-              color: '#ccc'
-            },
-            ticks: { color: '#ccc' },
-            grid: { color: '#1e3a47' }
-          }
-        }
-      }
-    });
-
-  } catch (err) {
-    console.error('Error rendering all haulers fuel vs speed chart:', err);
-
-    const chartContainer = document.getElementById('fuelVsSpeedContainer');
-    if (chartContainer) {
-      chartContainer.innerHTML =
-        '<div style="color: #ff4444; text-align: center; padding: 20px;">Error loading data</div>';
-    }
-  }
-}
-   
     window.renderFuelGradientForHauler = renderFuelGradientForHauler;
     window.renderAllHaulersFuelChart = renderAllHaulersFuelChart;
     window.renderFuelVsSpeedForHauler = renderFuelVsSpeedForHauler;
@@ -3943,11 +3943,11 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
       console.trace('initializeDynamicMapSimulation called for region:', region);
 
       const deviceDisplayNames = {
-        'D3': '28',
+        'D3': '135',
         'D8': '133',
-        'D9': '09',
+        'D9': '137',
         'D7': '07',
-        'D12': '95',
+        'D12': '134',
         'D14': '14'
       };
 
@@ -4021,7 +4021,15 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
           if (!pathHistory[haulerId]) return [];
           const now = Date.now();
           const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
-          return pathHistory[haulerId].filter(point => point.timestamp >= twentyFourHoursAgo);
+          // Filter by time AND also filter out invalid positions (optional)
+          return pathHistory[haulerId].filter(point => {
+            if (point.timestamp < twentyFourHoursAgo) return false;
+            // Optional: Also filter out points with invalid coordinates
+            if (!point.pos || !Array.isArray(point.pos) || point.pos.length !== 2) return false;
+            const [lat, lng] = point.pos;
+            if (isNaN(lat) || isNaN(lng)) return false;
+            return true;
+          });
         }
 
         function calculateSegmentDistance(segment1, segment2) {
@@ -4029,11 +4037,16 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
           const distanceKm = haversineKm(segment1.pos, segment2.pos);
           return { distance: distanceKm, pitchDisplay: getPitchDisplay(segment2.pitch), movementLabel: getMovementLabel(segment2.pitch) };
         }
-
         function analyzePathSegments24Hour(haulerId) {
           const segments = get24HourPathHistory(haulerId);
           if (!segments || segments.length < 2) {
-            return { total: 0, totalDistance: 0, flatSegments: 0, gradientSegments: 0, gradient5to30: 0, gradient30to50: 0, gradientAbove50: 0, flatDistance: 0, gradientDistance: 0, gradient5to30Distance: 0, gradient30to50Distance: 0, gradientAbove50Distance: 0, is24Hour: true, dataPoints: 0 };
+            return {
+              total: 0, totalDistance: 0, flatSegments: 0, gradientSegments: 0,
+              gradient5to30: 0, gradient30to50: 0, gradientAbove50: 0,
+              flatDistance: 0, gradientDistance: 0,
+              gradient5to30Distance: 0, gradient30to50Distance: 0, gradientAbove50Distance: 0,
+              is24Hour: true, dataPoints: 0
+            };
           }
 
           let totalDistance = 0, segmentCount = 0, flatSegments = 0, gradientSegments = 0;
@@ -4042,6 +4055,13 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
 
           for (let i = 1; i < segments.length; i++) {
             const calc = calculateSegmentDistance(segments[i - 1], segments[i]);
+
+            // ✅ SKIP if distance > 5km (invalid jump)
+            if (calc.distance > 5) {
+              console.log(`📊 ${haulerId}: Skipping invalid segment in analysis: ${calc.distance.toFixed(2)}km`);
+              continue;
+            }
+
             totalDistance += calc.distance;
             segmentCount++;
 
@@ -4053,31 +4073,54 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
             } else {
               gradientSegments++;
               gradientDistance += calc.distance;
-              if (pitch > 5 && pitch <= 30) { gradient5to30++; gradient5to30Distance += calc.distance; }
-              else if (pitch > 30 && pitch <= 50) { gradient30to50++; gradient30to50Distance += calc.distance; }
-              else if (pitch > 50) { gradientAbove50++; gradientAbove50Distance += calc.distance; }
+              if (pitch > 5 && pitch <= 30) {
+                gradient5to30++;
+                gradient5to30Distance += calc.distance;
+              } else if (pitch > 30 && pitch <= 50) {
+                gradient30to50++;
+                gradient30to50Distance += calc.distance;
+              } else if (pitch > 50) {
+                gradientAbove50++;
+                gradientAbove50Distance += calc.distance;
+              }
             }
           }
 
           return {
-            total: segmentCount, totalDistance: totalDistance,
-            flatSegments: flatSegments, gradientSegments: gradientSegments,
-            gradient5to30: gradient5to30, gradient30to50: gradient30to50, gradientAbove50: gradientAbove50,
-            flatDistance: flatDistance, gradientDistance: gradientDistance,
-            gradient5to30Distance: gradient5to30Distance, gradient30to50Distance: gradient30to50Distance, gradientAbove50Distance: gradientAbove50Distance,
-            is24Hour: true, dataPoints: segments.length
+            total: segmentCount,
+            totalDistance: totalDistance,
+            flatSegments: flatSegments,
+            gradientSegments: gradientSegments,
+            gradient5to30: gradient5to30,
+            gradient30to50: gradient30to50,
+            gradientAbove50: gradientAbove50,
+            flatDistance: flatDistance,
+            gradientDistance: gradientDistance,
+            gradient5to30Distance: gradient5to30Distance,
+            gradient30to50Distance: gradient30to50Distance,
+            gradientAbove50Distance: gradientAbove50Distance,
+            is24Hour: true,
+            dataPoints: segments.length
           };
         }
+
+
 
         function calculatePathDistance24Hour(haulerId) {
           const segments = get24HourPathHistory(haulerId);
           if (!segments || segments.length < 2) return 0;
           let totalDistance = 0;
           for (let i = 1; i < segments.length; i++) {
-            totalDistance += haversineKm(segments[i - 1].pos, segments[i].pos);
+            const distance = haversineKm(segments[i - 1].pos, segments[i].pos);
+            // ✅ ONLY add distance if <= 5km (valid movement)
+            if (distance <= 5) {
+              totalDistance += distance;
+            }
           }
           return totalDistance;
         }
+
+
 
         const PATH_HISTORY_KEY = `hauler_path_history_${region}`;
 
@@ -4445,10 +4488,8 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
             vehicleMarkers[haulerId] = [];
           }
 
-          let centerPosition = null;
           // Center map based on selection
           if (selectedHauler === 'all') {
-            // Try to center on first available vehicle
             let centered = false;
             for (const haulerId in sites) {
               if (sites[haulerId] && sites[haulerId].pos) {
@@ -4470,14 +4511,12 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
               }, 500);
             }
           } else {
-            // Center on selected hauler
             const centerPosition = getHaulerCurrentPosition(selectedHauler);
             if (centerPosition) {
               map.setView(centerPosition, 15);
               console.log(`🎯 Centering map on ${selectedHauler} at:`, centerPosition);
             } else {
               console.log(`⚠️ No position for ${selectedHauler} yet, will retry`);
-              // Retry after a short delay
               setTimeout(() => {
                 const retryPos = getHaulerCurrentPosition(selectedHauler);
                 if (retryPos) {
@@ -4487,22 +4526,63 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
               }, 500);
             }
           }
-          // Draw path for all haulers
+
+          // Draw path for selected haulers
           for (const haulerId in pathHistory) {
             if (selectedHauler !== 'all' && haulerId !== selectedHauler) continue;
 
             if (pathHistory[haulerId].length > 1) {
-              const positions = pathHistory[haulerId].map(p => p.pos);
+              // ========== SIMPLIFIED: Only filter by distance, NOT by hardcoded bounds ==========
+              // Build valid segments by checking distance between consecutive points ONLY
+              const validPoints = [];
+              for (let i = 0; i < pathHistory[haulerId].length; i++) {
+                const point = pathHistory[haulerId][i];
+
+                // Skip points with invalid coordinates (NaN, null, or zero)
+                if (!point.pos || !Array.isArray(point.pos) || point.pos.length !== 2) continue;
+                const [lat, lng] = point.pos;
+                if (isNaN(lat) || isNaN(lng)) continue;
+                if (lat === 0 && lng === 0) continue;
+
+                if (validPoints.length === 0) {
+                  validPoints.push(point);
+                } else {
+                  const lastPoint = validPoints[validPoints.length - 1];
+                  const distance = haversineKm(lastPoint.pos, point.pos);
+
+                  // ONLY add if distance is <= 5km (valid movement)
+                  // This filters out the jumps to South Africa/Karnataka
+                  if (distance <= 5) {
+                    validPoints.push(point);
+                  } else {
+                    console.log(`🚫 ${haulerId}: Skipping invalid jump of ${distance.toFixed(2)}km at index ${i}`);
+                  }
+                }
+              }
+
+              if (validPoints.length < 2) {
+                console.log(`⚠️ ${haulerId}: Not enough valid points to draw path (${validPoints.length} points out of ${pathHistory[haulerId].length})`);
+                continue;
+              }
+
+              console.log(`✅ ${haulerId}: Drawing ${validPoints.length} valid points out of ${pathHistory[haulerId].length} total`);
+
+              const positions = validPoints.map(p => p.pos);
               const baseColor = getHaulerBaseColor(haulerId);
 
               pathSegments[haulerId] = [];
-              vehicleMarkers[haulerId] = [];
 
-              // Draw segments between consecutive points
-              for (let i = 1; i < pathHistory[haulerId].length; i++) {
-                const prevPoint = pathHistory[haulerId][i - 1];
-                const currentPoint = pathHistory[haulerId][i];
+              // Draw segments ONLY between valid consecutive points
+              for (let i = 1; i < validPoints.length; i++) {
+                const prevPoint = validPoints[i - 1];
+                const currentPoint = validPoints[i];
                 const calc = calculateSegmentDistance(prevPoint, currentPoint);
+
+                // Double-check distance is valid
+                if (calc.distance > 5) {
+                  console.log(`⚠️ ${haulerId}: Skipping segment with distance ${calc.distance.toFixed(2)}km`);
+                  continue;
+                }
 
                 const pitch = Math.abs(currentPoint.pitch || 0);
                 const segmentType = pitch <= 5 ? 'flat' : 'gradient';
@@ -4518,17 +4598,17 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
                 const segmentTypeColor = segmentType === 'flat' ? '#4CAF50' : '#FF9800';
 
                 segment.bindPopup(`
-                  <div style="min-width: 200px;">
-                    <b>${getDisplayName(haulerId)} - Segment ${i}</b><br>
-                    <hr style="margin: 5px 0;">
-                    <b>Segment Info:</b><br>
-                    • Type: <b style="color:${segmentTypeColor}">${segmentTypeLabel}</b><br>
-                    • Gradient Angle: ${getPitchDisplay(currentPoint.pitch)}<br>
-                    • Elevation: ${getMovementLabel(currentPoint.pitch)}<br>
-                    • Distance: ${(calc.distance * 1000).toFixed(1)} m<br>
-                    • From: ${prevPoint.pos[0].toFixed(6)}, ${prevPoint.pos[1].toFixed(6)}<br>
-                    • To: ${currentPoint.pos[0].toFixed(6)}, ${currentPoint.pos[1].toFixed(6)}
-                  </div>
+                    <div style="min-width: 200px;">
+                        <b>${getDisplayName(haulerId)} - Segment ${i}</b><br>
+                        <hr style="margin: 5px 0;">
+                        <b>Segment Info:</b><br>
+                        • Type: <b style="color:${segmentTypeColor}">${segmentTypeLabel}</b><br>
+                        • Gradient Angle: ${getPitchDisplay(currentPoint.pitch)}<br>
+                        • Elevation: ${getMovementLabel(currentPoint.pitch)}<br>
+                        • Distance: ${(calc.distance * 1000).toFixed(1)} m<br>
+                        • From: ${prevPoint.pos[0].toFixed(6)}, ${prevPoint.pos[1].toFixed(6)}<br>
+                        • To: ${currentPoint.pos[0].toFixed(6)}, ${currentPoint.pos[1].toFixed(6)}
+                    </div>
                 `);
 
                 currentPoint.distance = calc.distance;
@@ -4537,9 +4617,10 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
                 currentPoint.segmentType = segmentType;
               }
 
-              // Add markers for each point
-              for (let i = 0; i < pathHistory[haulerId].length; i++) {
-                const point = pathHistory[haulerId][i];
+              // Add markers for valid points only
+              pathMarkers[haulerId] = [];
+              for (let i = 0; i < validPoints.length; i++) {
+                const point = validPoints[i];
 
                 const marker = L.circleMarker(point.pos, {
                   radius: 3, color: baseColor, fillColor: baseColor, fillOpacity: 0.7, weight: 1, interactive: true
@@ -4550,160 +4631,138 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
                   const vibrationLabel = getVibrationLabel(point.vibration);
                   const excavatorState = detectExcavatorState(point.vibration, point.movement);
                   vibrationInfo = `
-                    <hr style="margin: 5px 0;">
-                    <b>Vibration Analysis:</b><br>
-                    • Vibration Level: <b style="color:${point.vibration <= 2 ? '#4CAF50' :
-                      point.vibration <= 4 ? '#FF9800' :
-                        '#F44336'
-                    }">${vibrationLabel}</b><br>
-                    • Detected State: <b style="color:${excavatorState === 'IDLE' ? '#4CAF50' :
+                        <hr style="margin: 5px 0;">
+                        <b>Vibration Analysis:</b><br>
+                        • Vibration Level: <b style="color:${point.vibration <= 2 ? '#4CAF50' :
+                      point.vibration <= 4 ? '#FF9800' : '#F44336'}">${vibrationLabel}</b><br>
+                        • Detected State: <b style="color:${excavatorState === 'IDLE' ? '#4CAF50' :
                       excavatorState === 'OPERATING' ? '#FF9800' :
-                        excavatorState === 'LOADING' ? '#F44336' : '#9E9E9E'
-                    }">${excavatorState}</b><br>
-                  `;
+                        excavatorState === 'LOADING' ? '#F44336' : '#9E9E9E'}">${excavatorState}</b><br>
+                    `;
                 }
 
                 marker.bindPopup(`
-                  <div style="min-width: 200px;">
-                    <b>${getDisplayName(haulerId)} - Point ${i + 1}</b><br>
-                    <hr style="margin: 5px 0;">
-                    <b>Position Info:</b><br>
-                    • Lat: ${point.pos[0].toFixed(6)}<br>
-                    • Lng: ${point.pos[1].toFixed(6)}<br>
-                    • RL: ${point.rl} m (Z:${point.altitude?.toFixed(1)} + C:${FIXED_SEA_LEVEL_HEIGHT})<br>
-                    ${vibrationInfo}
-                  </div>
+                    <div style="min-width: 200px;">
+                        <b>${getDisplayName(haulerId)} - Point ${i + 1}</b><br>
+                        <hr style="margin: 5px 0;">
+                        <b>Position Info:</b><br>
+                        • Lat: ${point.pos[0].toFixed(6)}<br>
+                        • Lng: ${point.pos[1].toFixed(6)}<br>
+                        • RL: ${point.rl} m (Z:${point.altitude?.toFixed(1)} + C:${FIXED_SEA_LEVEL_HEIGHT})<br>
+                        ${vibrationInfo}
+                    </div>
                 `);
 
-                if (!pathMarkers[haulerId]) pathMarkers[haulerId] = [];
                 pathMarkers[haulerId].push(marker);
               }
 
-              // Add background path polyline
-              pathPolylines[haulerId] = L.polyline(positions, {
-                color: baseColor, weight: 2, opacity: 0.3, lineCap: 'round',
-                dashArray: haulerId === 'D7' ? '10, 10' : null, interactive: false
-              }).addTo(map);
+              // Add background path polyline using ONLY valid positions
+              if (positions.length >= 2) {
+                pathPolylines[haulerId] = L.polyline(positions, {
+                  color: baseColor, weight: 2, opacity: 0.3, lineCap: 'round',
+                  dashArray: haulerId === 'D7' ? '10, 10' : null, interactive: false
+                }).addTo(map);
 
-              const lastPoint = pathHistory[haulerId][pathHistory[haulerId].length - 1];
-              const segmentAnalysis = analyzePathSegments24Hour(haulerId);
-              const segmentInfo = `
-                <hr style="margin: 5px 0;">
-                <b>Path Segment Analysis (24-hour):</b><br>
-                • Flat Segments: <b style="color:#4CAF50">${segmentAnalysis.flatSegments}</b><br>
-                • Gradient Segments: <b style="color:#FF9800">${segmentAnalysis.gradientSegments}</b><br>
-                • Flat Distance: <b style="color:#4CAF50">${segmentAnalysis.flatDistance.toFixed(3)} km</b><br>
-                • Gradient Distance: <b style="color:#FF9800">${segmentAnalysis.gradientDistance.toFixed(3)} km</b><br>
-                <small>Flat: ≤5° | Gradient: >5°</small>
-              `;
+                const lastPoint = validPoints[validPoints.length - 1];
+                const segmentAnalysis = analyzePathSegments24Hour(haulerId);
+                const segmentInfo = `
+                    <hr style="margin: 5px 0;">
+                    <b>Path Segment Analysis (24-hour):</b><br>
+                    • Flat Segments: <b style="color:#4CAF50">${segmentAnalysis.flatSegments}</b><br>
+                    • Gradient Segments: <b style="color:#FF9800">${segmentAnalysis.gradientSegments}</b><br>
+                    • Flat Distance: <b style="color:#4CAF50">${segmentAnalysis.flatDistance.toFixed(3)} km</b><br>
+                    • Gradient Distance: <b style="color:#FF9800">${segmentAnalysis.gradientDistance.toFixed(3)} km</b><br>
+                    <small>Flat: ≤5° | Gradient: >5°</small>
+                `;
 
-              pathPolylines[haulerId].bindPopup(`
-                <div style="min-width: 250px;">
-                  <b>${getDisplayName(haulerId)} - 24 Hour Travel Path</b><br>
-                  <hr style="margin: 5px 0;">
-                  <b>Current Position:</b><br>
-                  • Lat: ${lastPoint.pos[0].toFixed(6)}<br>
-                  • Lng: ${lastPoint.pos[1].toFixed(6)}<br>
-                  • Current RL: ${lastPoint.rl} m (Z:${lastPoint.altitude?.toFixed(1)} + C:${FIXED_SEA_LEVEL_HEIGHT})<br>
-                  ${segmentInfo}
-                </div>
-              `);
+                pathPolylines[haulerId].bindPopup(`
+                    <div style="min-width: 250px;">
+                        <b>${getDisplayName(haulerId)} - 24 Hour Travel Path</b><br>
+                        <hr style="margin: 5px 0;">
+                        <b>Current Position:</b><br>
+                        • Lat: ${lastPoint.pos[0].toFixed(6)}<br>
+                        • Lng: ${lastPoint.pos[1].toFixed(6)}<br>
+                        • Current RL: ${lastPoint.rl} m (Z:${lastPoint.altitude?.toFixed(1)} + C:${FIXED_SEA_LEVEL_HEIGHT})<br>
+                        ${segmentInfo}
+                    </div>
+                `);
+              }
             }
           }
 
-          // Add current position markers for all vehicles
+          // Add current position markers for selected vehicles
           for (const haulerId in sites) {
             if (selectedHauler !== 'all' && haulerId !== selectedHauler) continue;
 
             if (sites[haulerId] && sites[haulerId].pos) {
               const s = sites[haulerId];
+              const baseColor = getHaulerBaseColor(haulerId);
+              const isExcavator = (haulerId === 'D7');
 
-              if (haulerId === 'D7') {
+              if (isExcavator) {
                 const vibration = s.vibration || 0;
                 const vibrationLabel = getVibrationLabel(vibration);
                 const excavatorState = detectExcavatorState(vibration, s.movement);
 
                 const excavatorMarker = L.marker(s.pos, {
                   icon: L.divIcon({
-                    html: `<div style="background:#FF5722;padding:4px;border-radius:50%;font-weight:700;color:#000;font-size:10px;border:3px solid #fff;box-shadow: 0 0 10px rgba(0,0,0,0.5);">EXCAVATOR</div>`,
-                    iconSize: [70, 70], className: 'excavator-icon'
-                  }),
-                  interactive: true
+                    html: `<div style="background:#FF5722;padding:4px 8px;border-radius:4px;font-weight:700;color:#fff;font-size:11px;border:2px solid #fff;white-space:nowrap;">EXCAVATOR ${getDisplayName(haulerId)}</div>`,
+                    iconSize: [100, 30],
+                    className: 'excavator-icon'
+                  })
                 }).addTo(map).bindPopup(`
-                  <div style="min-width: 280px;">
-                    <b>EXCAVATOR (${getDisplayName('D7')})</b><br>
-                    <hr style="margin: 5px 0;">
-                    <b>Current Position:</b><br>
-                    • Lat: ${s.pos[0].toFixed(6)}<br>
-                    • Lng: ${s.pos[1].toFixed(6)}<br>
-                    • RL: ${s.rl} m (Z:${s.altitude?.toFixed(1)} + C:${FIXED_SEA_LEVEL_HEIGHT})<br>
-                    <hr style="margin: 5px 0;">
-                    <b>Vibration Analysis:</b><br>
-                    • Vibration Level: <b style="color:${vibration <= 2 ? '#4CAF50' :
-                    vibration <= 4 ? '#FF9800' :
-                      '#F44336'
-                  }">${vibrationLabel} (${vibration})</b><br>
-                    • Detected State: <b style="color:${excavatorState === 'IDLE' ? '#4CAF50' :
-                    excavatorState === 'OPERATING' ? '#FF9800' :
-                      excavatorState === 'LOADING' ? '#F44336' : '#9E9E9E'
-                  }">${excavatorState}</b><br>
-                  </div>
+                    <div style="min-width: 280px;">
+                        <b>EXCAVATOR (${getDisplayName(haulerId)})</b><br>
+                        <hr style="margin: 5px 0;">
+                        <b>Current Position:</b><br>
+                        • Lat: ${s.pos[0].toFixed(6)}<br>
+                        • Lng: ${s.pos[1].toFixed(6)}<br>
+                        • RL: ${s.rl} m<br>
+                        <hr style="margin: 5px 0;">
+                        <b>Vibration Analysis:</b><br>
+                        • Vibration Level: <b style="color:${vibration <= 2 ? '#4CAF50' : vibration <= 4 ? '#FF9800' : '#F44336'}">${vibrationLabel} (${vibration})</b><br>
+                        • Detected State: <b>${excavatorState}</b><br>
+                    </div>
                 `);
 
                 if (!vehicleMarkers[haulerId]) vehicleMarkers[haulerId] = [];
                 vehicleMarkers[haulerId].push(excavatorMarker);
-
-                const rlVal = s.rl;
-                if (rlVal !== null) {
-                  const rlMarker = L.marker([s.pos[0] - 0.0001, s.pos[1]], {
-                    icon: L.divIcon({
-                      html: `<div style="${rlButtonStyle}">RL: ${rlVal}m</div>`,
-                      iconSize: [48, 20], className: 'rl-button'
-                    }),
-                    interactive: true
-                  }).addTo(map).bindPopup(`<b>${getDisplayName(s.id)} - RL: ${rlVal} m (Z:${s.altitude?.toFixed(1)} + C:${FIXED_SEA_LEVEL_HEIGHT})</b>`);
-                  vehicleMarkers[haulerId].push(rlMarker);
-                }
               } else {
-                const rlVal = s.rl;
-                if (rlVal !== null) {
-                  const rlMarker = L.marker([s.pos[0] - 0.0001, s.pos[1]], {
-                    icon: L.divIcon({
-                      html: `<div style="${rlButtonStyle}">RL: ${rlVal}m</div>`,
-                      iconSize: [48, 20], className: 'rl-button'
-                    }),
-                    interactive: true
-                  }).addTo(map).bindPopup(`<b>${getDisplayName(s.id)} - RL: ${rlVal} m (Z:${s.altitude?.toFixed(1)} + C:${FIXED_SEA_LEVEL_HEIGHT})</b>`);
-
-                  if (!vehicleMarkers[haulerId]) vehicleMarkers[haulerId] = [];
-                  vehicleMarkers[haulerId].push(rlMarker);
-                }
-
-                const haulerColor = s.id === 'D3' ? '#2196F3' : s.id === 'D8' ? '#4CAF50' : s.id === 'D9' ? '#9C27B0' : s.id === 'D14' ? '#9C27B0' : '#2196F3';
                 const haulerMarker = L.marker(s.pos, {
                   icon: L.divIcon({
-                    html: `<div style="background:${haulerColor};padding:4px;border-radius:4px;font-weight:700;color:#000;font-size:10px;border:2px solid #fff;">${getDisplayName(s.id)}</div>`,
-                    iconSize: [40, 25]
-                  }),
-                  interactive: true
+                    html: `<div style="background:${baseColor};padding:4px 8px;border-radius:4px;font-weight:700;color:#fff;font-size:11px;border:2px solid #fff;white-space:nowrap;">HAULER ${getDisplayName(haulerId)}</div>`,
+                    iconSize: [90, 30]
+                  })
                 }).addTo(map).bindPopup(`
-                  <div style="min-width: 200px;">
-                    <b>${getDisplayName(s.id)} HAULER</b><br>
-                    <hr style="margin: 5px 0;">
-                    <b>Current Position:</b><br>
-                    • Lat: ${s.pos[0].toFixed(6)}<br>
-                    • Lng: ${s.pos[1].toFixed(6)}<br>
-                    • RL: ${s.rl} m (Z:${s.altitude?.toFixed(1)} + C:${FIXED_SEA_LEVEL_HEIGHT})<br>
-                  </div>
+                    <div style="min-width: 200px;">
+                        <b>${getDisplayName(haulerId)} HAULER</b><br>
+                        <hr style="margin: 5px 0;">
+                        <b>Current Position:</b><br>
+                        • Lat: ${s.pos[0].toFixed(6)}<br>
+                        • Lng: ${s.pos[1].toFixed(6)}<br>
+                        • RL: ${s.rl} m<br>
+                        • Speed: ${s.speed || 0} km/h<br>
+                        • Load: ${s.load || 0} t
+                    </div>
                 `);
 
                 if (!vehicleMarkers[haulerId]) vehicleMarkers[haulerId] = [];
                 vehicleMarkers[haulerId].push(haulerMarker);
               }
+
+              // Add RL marker
+              if (s.rl !== null) {
+                const rlMarker = L.marker([s.pos[0] - 0.0001, s.pos[1]], {
+                  icon: L.divIcon({
+                    html: `<div style="background:rgba(0,0,0,0.7);padding:2px 6px;border-radius:4px;font-size:10px;color:#fff;white-space:nowrap;">RL: ${s.rl}m</div>`,
+                    iconSize: [60, 20]
+                  })
+                }).addTo(map);
+                vehicleMarkers[haulerId].push(rlMarker);
+              }
             }
           }
         }
-
         drawPathHistory('D3');
 
         const haulers = {};
@@ -4765,7 +4824,7 @@ async function renderFuelVsSpeedForHauler(haulerId, forceRefresh = false) {
           }).join('|');
         }
 
-        
+
         async function smartPoll() {
           if (isPolling) return;
           isPolling = true;
