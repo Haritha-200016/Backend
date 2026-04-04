@@ -4309,6 +4309,105 @@
         pathHistory = loadPathHistory();
         pathHistory = cleanOldPathHistory(pathHistory);
 
+        // Add this function inside initializeDynamicMapSimulation, before loading backend data
+        async function fetchLast24HoursHistoricalData() {
+          console.log('📥 Fetching last 24 hours historical data...');
+
+          try {
+            // Calculate timestamps for last 24 hours
+            const now = new Date();
+            const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+
+            // Format for API - adjust endpoint based on your backend
+            // Try multiple possible endpoints
+            let historicalData = null;
+
+            // Option 1: Try to get data from fetchDashboardDataby with time range
+            const url = `${BASE_URL}/fetchDashboardDataby?company=${encodeURIComponent(company)}&sector=${encodeURIComponent(sector)}&region=${encodeURIComponent(region)}`;
+
+            const response = await fetch(url);
+            const json = await response.json();
+
+            if (json.status === 'success') {
+              let allRecords = [];
+
+              // Extract records based on data structure
+              if (json.data && Array.isArray(json.data)) {
+                allRecords = json.data;
+              } else if (json.devices && Array.isArray(json.devices)) {
+                if (json.devices.length > 0 && typeof json.devices[0] === 'object') {
+                  allRecords = json.devices;
+                }
+              }
+
+              if (allRecords.length > 0) {
+                console.log(`📊 Found ${allRecords.length} total records`);
+
+                // Filter to last 24 hours and sort by timestamp
+                const twentyFourHoursAgoMs = twentyFourHoursAgo.getTime();
+                const filteredRecords = allRecords.filter(record => {
+                  const recordTime = new Date(record.timestamp).getTime();
+                  return recordTime >= twentyFourHoursAgoMs;
+                });
+
+                console.log(`📊 Keeping ${filteredRecords.length} records from last 24 hours`);
+
+                // Group by device_id and add to pathHistory
+                filteredRecords.forEach(record => {
+                  const deviceId = record.device_id;
+                  if (!deviceId) return;
+
+                  const lat = parseFloat(record.latitude);
+                  const lng = parseFloat(record.longitude);
+
+                  // Skip invalid coordinates
+                  if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
+
+                  const timestamp = new Date(record.timestamp).getTime();
+                  const altitude = parseFloat(record.altitude) || 0;
+                  const rl = altitude + 525.5;
+
+                  if (!pathHistory[deviceId]) {
+                    pathHistory[deviceId] = [];
+                  }
+
+                  pathHistory[deviceId].push({
+                    pos: [lat, lng],
+                    timestamp: timestamp,
+                    rl: rl,
+                    altitude: altitude,
+                    pitch: parseFloat(record.pitch) || 0,
+                    roll: parseFloat(record.roll) || 0,
+                    vibration: parseFloat(record.vibration) || 0,
+                    movement: record.movement || 'STABLE',
+                    load: parseFloat(record.load) || 0,
+                    speed: parseFloat(record.speed) || 0
+                  });
+                });
+
+                // Sort each device's points by timestamp
+                for (const deviceId in pathHistory) {
+                  pathHistory[deviceId].sort((a, b) => a.timestamp - b.timestamp);
+                  console.log(`  ${deviceId}: ${pathHistory[deviceId].length} historical points loaded`);
+                }
+
+                // Save to localStorage
+                savePathHistory(pathHistory);
+                return true;
+              }
+            }
+
+            console.log('⚠️ No historical data available from backend');
+            return false;
+
+          } catch (err) {
+            console.error('Failed to fetch historical data:', err);
+            return false;
+          }
+        }
+
+        await fetchLast24HoursHistoricalData();
+
         let backend;
         try {
           backend = await fetchBackendData();
