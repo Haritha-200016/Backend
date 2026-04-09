@@ -664,6 +664,7 @@ class ExcelReportGenerator:
             'D8': '133',
             'D9': '137',
             'D7': '07',
+            'D10': '08',
             'D12': '134'
         }
         

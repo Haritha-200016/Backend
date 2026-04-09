@@ -1236,9 +1236,10 @@
     // ==================== DEVICE NAME MAPPING ====================
     const deviceDisplayNames = {
       'D3': '135',
-      'D7': '07',
+      'D7': '43',
       'D8': '133',
       'D9': '137',
+      'D10': '08',
       'D12': '134',
       'D14': '14'
     };
@@ -2754,7 +2755,8 @@
                 <option value="D3">135</option>
                 <option value="D8">133</option>
                 <option value="D9">137</option>
-                <option value="D7">07</option>
+                <option value="D7">43</option>
+                <option value="D10">08</option>
                 <option value="D12">134</option>
                 <option value="D14">14</option>
                 <option value="all">All Haulers</option>
@@ -3219,6 +3221,7 @@
           'D3': { fuel: '#2196F3', gradient: '#64B5F6' },
           'D8': { fuel: '#4CAF50', gradient: '#81C784' },
           'D9': { fuel: '#9C27B0', gradient: '#BA68C8' },
+          'D10': { fuel: '#00BCD4', gradient: '#4DD0E1' },
           'D12': { fuel: '#FF9F40', gradient: '#FFB74D' },
           'D14': { fuel: '#9C27B0', gradient: '#BA68C8' },
           'default': { fuel: '#36a2eb', gradient: '#32cd32' }
@@ -3341,7 +3344,7 @@
         }
 
         // Get all haulers with data
-        const haulers = ['D3', 'D7', 'D8', 'D9', 'D12', 'D14'].filter(id => haulerData[id] && haulerData[id].length > 0);
+        const haulers = ['D3', 'D7', 'D8', 'D9','D10', 'D12', 'D14'].filter(id => haulerData[id] && haulerData[id].length > 0);
 
         if (haulers.length === 0) {
           chartContainer.innerHTML = '<div style="color: #ccc; text-align: center; padding: 20px;">No vehicle data available</div>';
@@ -3350,7 +3353,7 @@
 
         const datasets = [];
         const colors = {
-          'D3': '#2196F3', 'D7': '#FF5722', 'D8': '#4CAF50', 'D9': '#9C27B0', 'D12': '#FF9F40', 'D14': '#9C27B0'
+          'D3': '#2196F3', 'D7': '#FF5722', 'D8': '#4CAF50', 'D9': '#9C27B0','D10': '#00BCD4', 'D12': '#FF9F40', 'D14': '#9C27B0'
         };
 
         let allLabels = [];
@@ -3547,6 +3550,7 @@
           'D3': { fuel: '#2196F3', speed: '#64B5F6' },
           'D8': { fuel: '#4CAF50', speed: '#81C784' },
           'D9': { fuel: '#9C27B0', speed: '#BA68C8' },
+          'D10': { fuel: '#00BCD4', speed: '#4DD0E1' },
           'D12': { fuel: '#FF9F40', speed: '#FFB74D' },
           'D14': { fuel: '#9C27B0', speed: '#BA68C8' },
           'default': { fuel: '#36a2eb', speed: '#32cd32' }
@@ -3815,7 +3819,7 @@
         }
 
         // Haulers
-        const haulers = ['D3', 'D7', 'D8', 'D9', 'D12', 'D14']
+        const haulers = ['D3', 'D7', 'D8', 'D9','D10', 'D12', 'D14']
           .filter(id => haulerData[id] && haulerData[id].length > 0);
 
         if (haulers.length === 0) {
@@ -3830,6 +3834,7 @@
           'D7': '#FF5722',
           'D8': '#4CAF50',
           'D9': '#9C27B0',
+          'D10': '#00BCD4',
           'D12': '#FF9F40',
           'D14': '#795548'
         };
@@ -3946,7 +3951,8 @@
         'D3': '135',
         'D8': '133',
         'D9': '137',
-        'D7': '07',
+        'D7': '43',
+        'D10': '08',
         'D12': '134',
         'D14': '14'
       };
@@ -4537,6 +4543,8 @@
             case 'D7': return '#FF5722';
             case 'D8': return '#4CAF50';
             case 'D9': return '#9C27B0';
+            case 'D10': return '#00BCD4';
+            case 'D12': return '#FF9F40';
             case 'D14': return '#9C27B0';
             default: return '#9C27B0';
           }

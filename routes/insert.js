@@ -4,9 +4,6 @@ const db = require('../dao/dao');
 const nodemailer = require('nodemailer');
 const { exec } = require('child_process');
 
-// ==================== GLOBAL CONSTANTS ====================
-const DIESEL_PRICE_PER_LITER = 94.5; // ₹ per liter
-const SEA_LEVEL_RL = 525.5; // Fixed sea level height
 
 
 
@@ -250,7 +247,7 @@ const insertRealtimeData = (req, res) => {
     roll,
     movement,
     vibration,
-    fuel,
+    fuel_liters,
     pressure,
     count1,
     timestamp,
@@ -452,8 +449,8 @@ const insertRealtimeData = (req, res) => {
             fuelUsed = distance * rate;
           }
           // ✅ fuel (ONLY if device sends)
-          if (fuel !== undefined && fuel !== null) {
-            fuelValue = safeFloat(fuel);
+          if (fuel_liters !== undefined && fuel_liters !== null) {
+            fuelValue = safeFloat(fuel_liters);
           } else {
             fuelValue = null; // important
           }
