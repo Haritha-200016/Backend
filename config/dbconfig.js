@@ -1,5 +1,5 @@
 module.exports = {
-    host: "104.154.141.198",
+    host: "34.133.23.147",
     port: 3306,
     user: "root",
     password: "vistaarnksh",
