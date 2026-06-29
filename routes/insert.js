@@ -5,8 +5,6 @@ const nodemailer = require('nodemailer');
 const { exec } = require('child_process');
 
 
-
-
 // ==================== API ENDPOINTS ====================
 
 // 1. REGISTER TOKEN (Unchanged)
@@ -247,7 +245,7 @@ const insertRealtimeData = (req, res) => {
     roll,
     movement,
     vibration,
-    fuel_liters,
+    fuel,
     pressure,
     count1,
     timestamp,
@@ -449,8 +447,8 @@ const insertRealtimeData = (req, res) => {
             fuelUsed = distance * rate;
           }
           // ✅ fuel (ONLY if device sends)
-          if (fuel_liters !== undefined && fuel_liters !== null) {
-            fuelValue = safeFloat(fuel_liters);
+          if (fuel !== undefined && fuel !== null) {
+            fuelValue = safeFloat(fuel);
           } else {
             fuelValue = null; // important
           }
@@ -1690,8 +1688,12 @@ if (timeRange === 'shift' && shift) {
         fuel: parseFloat(row.fuel || 0),
         speed: parseFloat(row.speed || 0),
         distance: parseFloat(row.distance || 0),
-        fuel_cost: parseFloat(row.fuel_cost || 0)
-      }))
+        alt: parseFloat(row.altitude || 0),      // ✅ ADD altitude
+        rl: parseFloat(row.rl || 0),
+        fuel_cost: parseFloat(row.fuel_cost || 0),
+        vibration: parseFloat(row.vibration || 0)
+      })),
+      report_type: timeRange 
     };
 
     console.log(`🚀 Sending ${records.length} records to Python for analysis...`);
