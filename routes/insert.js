@@ -70,7 +70,7 @@ const registerToken = (req, res) => {
 };
 
 
-/*//THIS CODE WAS WORKING GOOD 
+/*//THIS CODE WAS WORKING GOODmain code 
 const insertRealtimeData = (req, res) => {
   const {
     device_id,
@@ -412,6 +412,8 @@ const insertRealtimeData = (req, res) => {
         WHERE device_id=?
         AND latitude IS NOT NULL
         AND longitude IS NOT NULL
+        AND fuel IS NOT NULL
+        AND fuel > 0
         ORDER BY id DESC
         LIMIT 1
         `,
@@ -852,80 +854,7 @@ const getDeviceShiftData = (req, res) => {
 };
 
 // Get shift data for ALL devices in a region
-/*const getAllDevicesShiftData = (req, res) => {
-  const { shift, region_id } = req.query;
-
-  if (!shift || !region_id) {
-    return res.status(400).json({ error: "shift and region_id required" });
-  }
-
-  const today = new Date().toISOString().split('T')[0];
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-
-  const shifts = {
-    'morning': { start: '06:00:00', end: '14:00:00' },
-    'afternoon': { start: '14:00:00', end: '22:00:00' },
-    'night': { start: '22:00:00', end: '06:00:00' }
-  };
-
-  if (!shifts[shift]) {
-    return res.status(400).json({ error: "Invalid shift" });
-  }
-
-  let query;
-  let params;
-
-  if (shift === 'night') {
-    query = `
-      SELECT * FROM realtime_sensor_data 
-      WHERE region_id = ?
-      AND (
-        (DATE(timestamp) = ? AND TIME(timestamp) >= '22:00:00')
-        OR
-        (DATE(timestamp) = ? AND TIME(timestamp) < '06:00:00')
-      )
-      ORDER BY device_id, timestamp ASC
-    `;
-    params = [region_id, today, tomorrow];
-  } else {
-    query = `
-      SELECT * FROM realtime_sensor_data 
-      WHERE region_id = ?
-      AND DATE(timestamp) = ?
-      AND TIME(timestamp) BETWEEN ? AND ?
-      ORDER BY device_id, timestamp ASC
-    `;
-    params = [region_id, today, shifts[shift].start, shifts[shift].end];
-  }
-
-  db.query(query, params, (err, results) => {
-    if (err) {
-      console.error("Error:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-
-    // Filter out null values from each row
-    const filteredResults = results.map(row => {
-      const filteredRow = {};
-      Object.keys(row).forEach(key => {
-        if (row[key] !== null && row[key] !== undefined) {
-          filteredRow[key] = row[key];
-        }
-      });
-      return filteredRow;
-    });
-
-    res.json({
-      status: "success",
-      region_id,
-      shift,
-      date: today,
-      total_records: filteredResults.length,
-      data: filteredResults
-    });
-  });
-};*/
-
+//complet code wotking final maincode 
 const getAllDevicesShiftData = (req, res) => {
   // DEBUG: Log everything
   console.log('========================================');
@@ -1020,6 +949,127 @@ const getAllDevicesShiftData = (req, res) => {
     });
   });
 };
+
+//this is for coustom date only siftwise 
+/*const getAllDevicesShiftData = (req, res) => {
+  // DEBUG: Log everything
+  console.log('========================================');
+  console.log('getAllDevicesShiftData called at:', new Date().toISOString());
+  console.log('Full req.query:', JSON.stringify(req.query, null, 2));
+  console.log('shift value:', req.query.shift);
+  console.log('region_id value:', req.query.region_id);
+  console.log('date value:', req.query.date);
+  console.log('========================================');
+
+  const { shift, region_id, date } = req.query;
+
+  if (!shift || !region_id) {
+    console.log('❌ Missing parameters!');
+    return res.status(400).json({ error: "shift and region_id required" });
+  }
+
+  // Determine the target date
+  let targetDate;
+  let dateStr;
+  let nextDayStr;
+
+  if (date) {
+    // Use provided date
+    targetDate = new Date(date);
+    if (isNaN(targetDate.getTime())) {
+      return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+    }
+    dateStr = targetDate.toISOString().split('T')[0];
+    console.log(`📅 Using provided date: ${dateStr}`);
+  } else {
+    // Use yesterday (June 29, 2026) or today if not specified
+    // For June 30, 2026, yesterday is June 29, 2026
+    targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() - 1); // Yesterday
+    dateStr = targetDate.toISOString().split('T')[0];
+    console.log(`📅 Using yesterday's date: ${dateStr}`);
+  }
+
+  // Calculate next day for night shift
+  const nextDay = new Date(targetDate);
+  nextDay.setDate(nextDay.getDate() + 1);
+  nextDayStr = nextDay.toISOString().split('T')[0];
+
+  console.log('📅 Target date:', dateStr);
+  console.log('📅 Next day:', nextDayStr);
+
+  const shifts = {
+    'morning': { start: '06:00:00', end: '14:00:00' },
+    'afternoon': { start: '14:00:00', end: '22:00:00' },
+    'night': { start: '22:00:00', end: '06:00:00' }
+  };
+
+  if (!shifts[shift]) {
+    console.log('❌ Invalid shift:', shift);
+    return res.status(400).json({ error: "Invalid shift" });
+  }
+
+  let query;
+  let params;
+
+  if (shift === 'night') {
+    query = `
+      SELECT * FROM realtime_sensor_data 
+      WHERE region_id = ?
+      AND (
+        (DATE(timestamp) = ? AND TIME(timestamp) >= '22:00:00')
+        OR
+        (DATE(timestamp) = ? AND TIME(timestamp) < '06:00:00')
+      )
+      ORDER BY device_id, timestamp ASC
+    `;
+    params = [region_id, dateStr, nextDayStr];
+  } else {
+    query = `
+      SELECT * FROM realtime_sensor_data 
+      WHERE region_id = ?
+      AND DATE(timestamp) = ?
+      AND TIME(timestamp) BETWEEN ? AND ?
+      ORDER BY device_id, timestamp ASC
+    `;
+    params = [region_id, dateStr, shifts[shift].start, shifts[shift].end];
+  }
+
+  console.log('🔍 SQL Query:', query);
+  console.log('🔍 Params:', params);
+
+  db.query(query, params, (err, results) => {
+    if (err) {
+      console.error("Error:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+
+    console.log(`✅ Found ${results.length} records for ${shift} shift on ${dateStr}`);
+
+    if (results.length > 0) {
+      console.log('📝 First record timestamp:', results[0].timestamp);
+    }
+
+    const filteredResults = results.map(row => {
+      const filteredRow = {};
+      Object.keys(row).forEach(key => {
+        if (row[key] !== null && row[key] !== undefined) {
+          filteredRow[key] = row[key];
+        }
+      });
+      return filteredRow;
+    });
+
+    res.json({
+      status: "success",
+      region_id,
+      shift,
+      date: dateStr,
+      total_records: filteredResults.length,
+      data: filteredResults
+    });
+  });
+};*/
 // ==================== DAILY (24hr - full day) ====================
 
 const getDeviceDailyData = (req, res) => {
@@ -1397,186 +1447,8 @@ const fetchDashboardDataby = (req, res) => {
 
 
 // ==================== ANALYSIS ENDPOINT ====================
-/*const generateAnalysisReport = (req, res) => {
-  const {
-    device_id,
-    timeRange,
-    shift,
-    region_id
-  } = req.query;
 
-  if (!device_id || !timeRange) {
-    return res.status(400).json({
-      error: "device_id and timeRange required"
-    });
-  }
-
-  console.log(`📊 Generating analysis for ${device_id} - ${timeRange} ${shift || ''} (Region: ${region_id || 'ALL'})`);
-
-  // Check if we need ALL devices or a specific one
-  const isAllDevices = device_id === 'all';
-
-  // Choose the right data fetcher based on timeRange and device selection
-  let dataFetcher;
-
-  if (isAllDevices) {
-    // Use the "ALL" versions of your functions
-    if (timeRange === 'shift' && shift) {
-      let shiftParam = '';
-      if (shift === '6am-2pm') shiftParam = 'morning';
-      else if (shift === '2pm-10pm') shiftParam = 'afternoon';
-      else if (shift === '10pm-6am') shiftParam = 'night';
-      else shiftParam = shift;
-
-      const newReq = {
-        ...req,
-        query: {
-          ...req.query,
-          shift: shiftParam,
-          region_id: region_id
-        }
-      };
-
-      dataFetcher = (req2, res2) => getAllDevicesShiftData(newReq, res2);
-    }
-    else if (timeRange === 'daily') {
-      if (region_id) req.query.region_id = region_id;
-      dataFetcher = getAllDevicesDailyData;
-    }
-    else if (timeRange === 'monthly') {
-      if (region_id) req.query.region_id = region_id;
-      dataFetcher = getAllDevicesMonthlyData;
-    }
-    else {
-      return res.status(400).json({ error: "Invalid timeRange" });
-    }
-  } else {
-    // Use single device versions
-    if (timeRange === 'shift' && shift) {
-      let shiftParam = '';
-      if (shift === '6am-2pm') shiftParam = 'morning';
-      else if (shift === '2pm-10pm') shiftParam = 'afternoon';
-      else if (shift === '10pm-6am') shiftParam = 'night';
-
-      req.query.shift = shiftParam;
-      if (region_id) req.query.region_id = region_id;
-      dataFetcher = getDeviceShiftData;
-    }
-    else if (timeRange === 'daily') {
-      if (region_id) req.query.region_id = region_id;
-      dataFetcher = getDeviceDailyData;
-    }
-    else if (timeRange === 'monthly') {
-      if (region_id) req.query.region_id = region_id;
-      dataFetcher = getDeviceMonthlyData;
-    }
-    else {
-      return res.status(400).json({ error: "Invalid timeRange" });
-    }
-  }
-
-  // Store the original res.json
-  const originalJson = res.json;
-
-  // Override res.json to capture the data
-  res.json = function (data) {
-    // Check if we have data in any format
-    let records = [];
-
-    // Handle different response formats
-    if (data && data.data && Array.isArray(data.data)) {
-      records = data.data;
-    } else if (data && Array.isArray(data)) {
-      records = data;
-    } else if (data && data.results && Array.isArray(data.results)) {
-      records = data.results;
-    }
-
-    console.log(`📊 Found ${records.length} records for analysis`);
-
-    // Format data for Python
-    const pythonInput = {
-      data: records.map(row => ({
-        device_id: row.device_id || device_id,
-        time: row.timestamp,
-        lat: parseFloat(row.latitude || 0),
-        lon: parseFloat(row.longitude || 0),
-        pitch: parseFloat(row.pitch || 0),
-        fuel: parseFloat(row.fuel || 0),
-        speed: parseFloat(row.speed || 0),
-        distance: parseFloat(row.distance || 0),
-        fuel_cost: parseFloat(row.fuel_cost || 0)
-      }))
-    };
-
-    console.log(`🚀 Sending ${records.length} records to Python for analysis...`);
-
-    // Call Python script
-     // const pythonPath = '/opt/sample/venv/bin/python'; // ✅ venv python
-     //const pythonProcess = exec(`${pythonPath} routes/analysis.py`, (error, stdout, stderr) => {
-     const pythonProcess = exec('python routes/analysis.py', (error, stdout, stderr) => {
-      if (error) {
-        console.error('❌ Python error:', error);
-        return originalJson.call(res, { error: "Analysis failed: " + error.message });
-      }
-
-      if (stderr) {
-        console.log('📝 Python log:', stderr);
-      }
-
-      try {
-        const result = JSON.parse(stdout);
-
-        // Check the status from Python
-        if (result.status === 'error') {
-          console.error('❌ Python analysis error:', result.error);
-          return originalJson.call(res, { error: result.error });
-        }
-
-        // Your analysis.py returns 'report' field with base64 Excel data
-        if (!result.report) {
-          console.error('❌ No report data in Python output');
-          console.log('Python output keys:', Object.keys(result));
-          return originalJson.call(res, { error: "No report data generated" });
-        }
-
-        // Decode the base64 Excel file
-        const excelBuffer = Buffer.from(result.report, 'base64');
-
-        // Use filename from Python
-        const filename = result.filename || `analysis_${device_id}_${timeRange}_${new Date().toISOString().split('T')[0]}.xlsx`;
-
-        // Set correct headers for Excel file download
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.setHeader('Content-Length', excelBuffer.length);
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-
-        // Send the Excel file
-        res.send(excelBuffer);
-
-        console.log(`✅ Analysis complete! Excel report sent: ${filename}`);
-        console.log(`📊 Report size: ${(excelBuffer.length / 1024).toFixed(2)} KB`);
-
-      } catch (e) {
-        console.error('❌ Failed to parse Python output:', e);
-        console.log('Raw output (first 500 chars):', stdout.substring(0, 500));
-        originalJson.call(res, { error: "Failed to generate report - invalid response from analysis engine" });
-      }
-    });
-
-    pythonProcess.stdin.write(JSON.stringify(pythonInput));
-    pythonProcess.stdin.end();
-  };
-
-  // Call the appropriate data fetcher
-  dataFetcher(req, res);
-};*/
-
-
-
+//final working code proper main code 
 const generateAnalysisReport = (req, res) => {
   const {
     device_id,
@@ -1693,7 +1565,9 @@ const generateAnalysisReport = (req, res) => {
         lat: parseFloat(row.latitude || 0),
         lon: parseFloat(row.longitude || 0),
         pitch: parseFloat(row.pitch || 0),
+        roll: parseFloat(row.roll || 0),
         fuel: parseFloat(row.fuel || 0),
+        fuel_consumption: parseFloat(row.fuel_consumption || 0),
         speed: parseFloat(row.speed || 0),
         distance: parseFloat(row.distance || 0),
         alt: parseFloat(row.altitude || 0),      // ✅ ADD altitude
@@ -1770,6 +1644,212 @@ const generateAnalysisReport = (req, res) => {
   // Call the appropriate data fetcher
   dataFetcher(req, res);
 };
+
+
+//report for coustom data 
+/*const generateAnalysisReport = (req, res) => {
+  const {
+    device_id,
+    timeRange,
+    shift,
+    region_id,
+    date  // Keep this parameter
+  } = req.query;
+
+  if (!device_id || !timeRange) {
+    return res.status(400).json({
+      error: "device_id and timeRange required"
+    });
+  }
+
+  // If no date provided, use yesterday (June 29, 2026)
+  let targetDate;
+  if (date) {
+    targetDate = date;
+  } else {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    targetDate = yesterday.toISOString().split('T')[0];
+  }
+  
+  console.log(`📊 Generating analysis for ${device_id} - ${timeRange} (Date: ${targetDate}) ${shift || ''} (Region: ${region_id || 'ALL'})`);
+
+  // Check if we need ALL devices or a specific one
+  const isAllDevices = device_id === 'all';
+
+  // Choose the right data fetcher based on timeRange and device selection
+  let dataFetcher;
+
+  if (isAllDevices) {
+    // Use the "ALL" versions of your functions
+    if (timeRange === 'shift' && shift) {
+      console.log('🔄 WRAPPER DEBUG:');
+      console.log('  Original shift from query:', shift);
+      console.log('  Original region_id:', region_id);
+
+      let shiftParam = '';
+      if (shift === '6am-2pm') shiftParam = 'morning';
+      else if (shift === '2pm-10pm') shiftParam = 'afternoon';
+      else if (shift === '10pm-6am') shiftParam = 'night';
+      else shiftParam = shift;
+
+      console.log('  Mapped shiftParam:', shiftParam);
+
+      const newReq = {
+        ...req,
+        query: {
+          ...req.query,
+          shift: shiftParam,
+          region_id: region_id,
+          date: targetDate  // Pass the date
+        }
+      };
+
+      console.log('  newReq.query:', newReq.query);
+
+      dataFetcher = (req2, res2) => {
+        console.log('📞 Calling getAllDevicesShiftData with:', req2.query);
+        getAllDevicesShiftData(req2, res2);
+      };
+    }
+    else if (timeRange === 'daily') {
+      if (region_id) req.query.region_id = region_id;
+      req.query.date = targetDate;
+      dataFetcher = getAllDevicesDailyData;
+    }
+    else if (timeRange === 'monthly') {
+      if (region_id) req.query.region_id = region_id;
+      req.query.date = targetDate;
+      dataFetcher = getAllDevicesMonthlyData;
+    }
+    else {
+      return res.status(400).json({ error: "Invalid timeRange" });
+    }
+  } else {
+    // Use single device versions
+    if (timeRange === 'shift' && shift) {
+      let shiftParam = '';
+      if (shift === '6am-2pm') shiftParam = 'morning';
+      else if (shift === '2pm-10pm') shiftParam = 'afternoon';
+      else if (shift === '10pm-6am') shiftParam = 'night';
+
+      req.query.shift = shiftParam;
+      if (region_id) req.query.region_id = region_id;
+      req.query.date = targetDate;
+      dataFetcher = getDeviceShiftData;
+    }
+    else if (timeRange === 'daily') {
+      if (region_id) req.query.region_id = region_id;
+      req.query.date = targetDate;
+      dataFetcher = getDeviceDailyData;
+    }
+    else if (timeRange === 'monthly') {
+      if (region_id) req.query.region_id = region_id;
+      req.query.date = targetDate;
+      dataFetcher = getDeviceMonthlyData;
+    }
+    else {
+      return res.status(400).json({ error: "Invalid timeRange" });
+    }
+  }
+
+  // Store the original res.json
+  const originalJson = res.json;
+
+  // Override res.json to capture the data
+  res.json = function (data) {
+    // Check if we have data in any format
+    let records = [];
+
+    // Handle different response formats
+    if (data && data.data && Array.isArray(data.data)) {
+      records = data.data;
+    } else if (data && Array.isArray(data)) {
+      records = data;
+    } else if (data && data.results && Array.isArray(data.results)) {
+      records = data.results;
+    }
+
+    console.log(`📊 Found ${records.length} records for analysis (Date: ${targetDate})`);
+
+    // Format data for Python
+    const pythonInput = {
+      data: records.map(row => ({
+        device_id: row.device_id || device_id,
+        time: row.timestamp,
+        lat: parseFloat(row.latitude || 0),
+        lon: parseFloat(row.longitude || 0),
+        pitch: parseFloat(row.pitch || 0),
+        roll: parseFloat(row.roll || 0),
+        fuel: parseFloat(row.fuel || 0),
+        fuel_consumption: parseFloat(row.fuel_consumption || 0),
+        speed: parseFloat(row.speed || 0),
+        distance: parseFloat(row.distance || 0),
+        alt: parseFloat(row.altitude || 0),
+        rl: parseFloat(row.rl || 0),
+        fuel_cost: parseFloat(row.fuel_cost || 0),
+        vibration: parseFloat(row.vibration || 0)
+      })),
+      report_type: timeRange,
+      target_date: targetDate
+    };
+
+    console.log(`🚀 Sending ${records.length} records to Python for analysis...`);
+
+    // Call Python script
+    const pythonProcess = exec('python routes/analysis.py', (error, stdout, stderr) => {
+      if (error) {
+        console.error('❌ Python error:', error);
+        return originalJson.call(res, { error: "Analysis failed: " + error.message });
+      }
+
+      if (stderr) {
+        console.log('📝 Python log:', stderr);
+      }
+
+      try {
+        const result = JSON.parse(stdout);
+
+        if (result.status === 'error') {
+          console.error('❌ Python analysis error:', result.error);
+          return originalJson.call(res, { error: result.error });
+        }
+
+        if (!result.report) {
+          console.error('❌ No report data in Python output');
+          console.log('Python output keys:', Object.keys(result));
+          return originalJson.call(res, { error: "No report data generated" });
+        }
+
+        const excelBuffer = Buffer.from(result.report, 'base64');
+        const filename = result.filename || `analysis_${device_id}_${timeRange}_${targetDate}.xlsx`;
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', excelBuffer.length);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+
+        res.send(excelBuffer);
+
+        console.log(`✅ Analysis complete! Excel report sent: ${filename}`);
+        console.log(`📊 Report size: ${(excelBuffer.length / 1024).toFixed(2)} KB`);
+
+      } catch (e) {
+        console.error('❌ Failed to parse Python output:', e);
+        console.log('Raw output (first 500 chars):', stdout.substring(0, 500));
+        originalJson.call(res, { error: "Failed to generate report - invalid response from analysis engine" });
+      }
+    });
+
+    pythonProcess.stdin.write(JSON.stringify(pythonInput));
+    pythonProcess.stdin.end();
+  };
+
+  // Call the appropriate data fetcher
+  dataFetcher(req, res);
+};*/
 // ==================== EXPORT ALL FUNCTIONS ====================
 module.exports = {
   register,
