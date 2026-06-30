@@ -412,8 +412,6 @@ const insertRealtimeData = (req, res) => {
         WHERE device_id=?
         AND latitude IS NOT NULL
         AND longitude IS NOT NULL
-        AND fuel IS NOT NULL
-        AND fuel > 0
         ORDER BY id DESC
         LIMIT 1
         `,
