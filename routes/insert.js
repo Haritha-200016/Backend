@@ -407,7 +407,7 @@ const insertRealtimeData = (req, res) => {
 
       pool.query(
         `
-        SELECT latitude, longitude
+        SELECT latitude, longitude, fuel
         FROM realtime_sensor_data
         WHERE device_id=?
         AND latitude IS NOT NULL
@@ -437,21 +437,29 @@ const insertRealtimeData = (req, res) => {
 
           /* ================= FUEL ================= */
 
-          if (fuel_consumption !== undefined && fuel_consumption !== null) {
-            // ✅ REAL SENSOR DEVICE
-            fuelUsed = safeFloat(fuel_consumption) || 0;
-          } else {
-            // ✅ ESTIMATION DEVICE
-            const BASE = 0.3;
-            let rate = BASE * (1 + Math.abs(pit || 0) * 0.05);
-            fuelUsed = distance * rate;
+          /* ================= FUEL ================= */
+
+          const currentFuel = safeFloat(fuel);
+          const previousFuel =
+            prev && prev.length > 0
+              ? safeFloat(prev[0].fuel)
+              : null;
+
+          fuelValue = currentFuel;
+          fuelUsed = 0;
+
+          // Calculate consumption only if
+          // current fuel is valid and lower than previous fuel
+          if (
+            currentFuel !== null &&
+            previousFuel !== null &&
+            currentFuel > 0 &&
+            currentFuel < previousFuel
+          ) {
+            fuelUsed = previousFuel - currentFuel;
           }
-          // ✅ fuel (ONLY if device sends)
-          if (fuel !== undefined && fuel !== null) {
-            fuelValue = safeFloat(fuel);
-          } else {
-            fuelValue = null; // important
-          }
+
+          // Ignore these cases:currentFuel === 0,currentFuel > previousFuel,currentFuel === previousFuel
 
           fuelCost = fuelUsed * FUEL_PRICE_PER_LITER;
 
@@ -682,7 +690,7 @@ const getLast10ZAxis = (req, res) => {
     return res.status(400).json({ error: "Company and region required" });
   }
 
-const query = `
+  const query = `
   SELECT device_id, pitch, speed, fuel, fuel_consumption, timestamp
   FROM (
     SELECT rs.device_id, rs.pitch, rs.speed, rs.fuel, rs.fuel_consumption, rs.timestamp,
@@ -926,7 +934,7 @@ const getAllDevicesShiftData = (req, res) => {
   console.log('shift value:', req.query.shift);
   console.log('region_id value:', req.query.region_id);
   console.log('========================================');
-  
+
   const { shift, region_id } = req.query;
 
   if (!shift || !region_id) {
@@ -936,7 +944,7 @@ const getAllDevicesShiftData = (req, res) => {
 
   const today = new Date().toISOString().split('T')[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-  
+
   console.log('📅 Calculated today:', today);
   console.log('📅 Calculated tomorrow:', tomorrow);
 
@@ -987,7 +995,7 @@ const getAllDevicesShiftData = (req, res) => {
     }
 
     console.log(`✅ Found ${results.length} records for ${shift} shift`);
-    
+
     if (results.length > 0) {
       console.log('📝 First record timestamp:', results[0].timestamp);
     }
@@ -1593,35 +1601,35 @@ const generateAnalysisReport = (req, res) => {
 
   if (isAllDevices) {
     // Use the "ALL" versions of your functions
-if (timeRange === 'shift' && shift) {
-  console.log('🔄 WRAPPER DEBUG:');
-  console.log('  Original shift from query:', shift);
-  console.log('  Original region_id:', region_id);
-  
-  let shiftParam = '';
-  if (shift === '6am-2pm') shiftParam = 'morning';
-  else if (shift === '2pm-10pm') shiftParam = 'afternoon';
-  else if (shift === '10pm-6am') shiftParam = 'night';
-  else shiftParam = shift;
-  
-  console.log('  Mapped shiftParam:', shiftParam);
-  
-  const newReq = {
-    ...req,
-    query: {
-      ...req.query,
-      shift: shiftParam,
-      region_id: region_id
+    if (timeRange === 'shift' && shift) {
+      console.log('🔄 WRAPPER DEBUG:');
+      console.log('  Original shift from query:', shift);
+      console.log('  Original region_id:', region_id);
+
+      let shiftParam = '';
+      if (shift === '6am-2pm') shiftParam = 'morning';
+      else if (shift === '2pm-10pm') shiftParam = 'afternoon';
+      else if (shift === '10pm-6am') shiftParam = 'night';
+      else shiftParam = shift;
+
+      console.log('  Mapped shiftParam:', shiftParam);
+
+      const newReq = {
+        ...req,
+        query: {
+          ...req.query,
+          shift: shiftParam,
+          region_id: region_id
+        }
+      };
+
+      console.log('  newReq.query:', newReq.query);
+
+      dataFetcher = (req2, res2) => {
+        console.log('📞 Calling getAllDevicesShiftData with:', req2.query);
+        getAllDevicesShiftData(req2, res2);
+      };
     }
-  };
-  
-  console.log('  newReq.query:', newReq.query);
-  
-  dataFetcher = (req2, res2) => {
-    console.log('📞 Calling getAllDevicesShiftData with:', req2.query);
-    getAllDevicesShiftData(req2, res2);
-  };
-}
     else if (timeRange === 'daily') {
       if (region_id) req.query.region_id = region_id;
       dataFetcher = getAllDevicesDailyData;
@@ -1662,7 +1670,7 @@ if (timeRange === 'shift' && shift) {
   const originalJson = res.json;
 
   // Override res.json to capture the data
-  res.json = function(data) {
+  res.json = function (data) {
     // Check if we have data in any format
     let records = [];
 
@@ -1693,7 +1701,7 @@ if (timeRange === 'shift' && shift) {
         fuel_cost: parseFloat(row.fuel_cost || 0),
         vibration: parseFloat(row.vibration || 0)
       })),
-      report_type: timeRange 
+      report_type: timeRange
     };
 
     console.log(`🚀 Sending ${records.length} records to Python for analysis...`);
@@ -1701,8 +1709,8 @@ if (timeRange === 'shift' && shift) {
     // Call Python script
     const pythonPath = '/opt/sample/venv/bin/python'; // ✅ venv python
 
-     const pythonProcess = exec(`${pythonPath} routes/analysis.py`, (error, stdout, stderr) => {
-      //const pythonProcess = exec('python routes/analysis.py', (error, stdout, stderr) => {
+    const pythonProcess = exec(`${pythonPath} routes/analysis.py`, (error, stdout, stderr) => {
+    //const pythonProcess = exec('python routes/analysis.py', (error, stdout, stderr) => {
       if (error) {
         console.error('❌ Python error:', error);
         return originalJson.call(res, { error: "Analysis failed: " + error.message });
