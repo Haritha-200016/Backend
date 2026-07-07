@@ -1,4 +1,1810 @@
-# routes/analysis.py - COMPLETE FINAL CODE WITH PROPER SHIFT/DAILY/MONTHLY
+# routes/analysis.py - COMPLETE CORRECTED CODE WITH REALISTIC TRIPS PER HOUR
+'''
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+import json
+import sys
+import base64
+from geopy.distance import geodesic
+from io import BytesIO
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from sklearn.cluster import DBSCAN
+import warnings
+warnings.filterwarnings('ignore')
+
+def convert_numpy_types(obj):
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        if np.isnan(obj) or np.isinf(obj):
+            return 0
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, pd.Timestamp):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {str(key): convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_numpy_types(item) for item in obj]
+    elif pd.isna(obj):
+        return 0
+    else:
+        return obj
+
+class SimpleMiningAnalytics:
+    def __init__(self):
+        self.diesel_price = 94.5
+        self.ton_per_trip = 35
+        
+        self.fuel_rates = {
+            'Steep Up': 1.05,
+            'Mild Up': 0.85,
+            'Flat': 0.65,
+            'Mild Down': 0.45,
+            'Steep Down': 0.25
+        }
+        
+        self.max_realistic_speed = 35
+        self.max_trips_per_shift = 13
+        
+        self.gradient_bands = {
+            'Steep Down': (-float('inf'), -8),
+            'Mild Down': (-8, -3),
+            'Flat': (-3, 3),
+            'Mild Up': (3, 8),
+            'Steep Up': (8, float('inf'))
+        }
+        
+        self.maintenance_lat = 20.4051928
+        self.maintenance_lon = 81.0662203
+        self.maintenance_radius = 100
+        
+        self.working_area_lat = 20.4088
+        self.working_area_lon = 81.0655
+        self.working_area_radius = 150
+        
+        self.min_trip_distance_km = 0.5
+        
+        self.hauler_ids = ['D3', 'D10', 'D11', 'D12', '137', '133', '134', '135']
+        self.excavator_ids = ['D7', '07', '7', '43']
+        self.bulldozer_ids = ['D8', '8']
+        
+        self.device_mapping = {
+            'D3': '137', 'D10': '133', 'D11': '134', 'D7': '43', 'D12': '135'
+        }
+    
+    def map_device_id(self, device_id):
+        return self.device_mapping.get(str(device_id).upper(), device_id)
+    
+    def is_hauler(self, device_id):
+        device_str = str(device_id).upper()
+        for hid in self.hauler_ids:
+            if hid.upper() in device_str:
+                return True
+        return False
+    
+    def is_excavator(self, device_id):
+        device_str = str(device_id).upper()
+        for eid in self.excavator_ids:
+            if eid.upper() in device_str:
+                return True
+        return False
+    
+    def is_bulldozer(self, device_id):
+        device_str = str(device_id).upper()
+        for bid in self.bulldozer_ids:
+            if bid.upper() in device_str:
+                return True
+        return False
+    
+    def is_in_maintenance_area(self, lat, lon):
+        if lat == 0 or lon == 0:
+            return False
+        try:
+            dist = geodesic((lat, lon), (self.maintenance_lat, self.maintenance_lon)).meters
+            return dist <= self.maintenance_radius
+        except:
+            return False
+    
+    def is_in_working_area(self, lat, lon):
+        if lat == 0 or lon == 0:
+            return False
+        try:
+            dist = geodesic((lat, lon), (self.working_area_lat, self.working_area_lon)).meters
+            return dist <= self.working_area_radius
+        except:
+            return False
+    
+    def classify_gradient(self, pitch):
+        if pd.isna(pitch):
+            return 'Flat'
+        if pitch > 30:
+            pitch = pitch - 90
+        elif pitch < -30:
+            pitch = pitch + 90
+        pitch = max(-30, min(30, pitch))
+        for band_name, (low, high) in self.gradient_bands.items():
+            if low < pitch <= high:
+                return band_name
+        return 'Flat'
+    
+    def calculate_distance_and_fuel(self, df):
+        distances = []
+        cumulative_distance = 0
+        cumulative_fuel = 0
+        
+        for i in range(len(df)):
+            if i == 0:
+                distances.append(0)
+                continue
+                
+            p1 = (df.iloc[i-1]['lat'], df.iloc[i-1]['lon'])
+            p2 = (df.iloc[i]['lat'], df.iloc[i]['lon'])
+            
+            if p1[0] == 0 or p1[1] == 0 or p2[0] == 0 or p2[1] == 0:
+                distances.append(0)
+                continue
+            
+            try:
+                dist_m = geodesic(p1, p2).meters
+                if dist_m > 5000:
+                    distances.append(0)
+                    continue
+                if dist_m < 1:
+                    distances.append(0)
+                    continue
+                    
+                distances.append(dist_m)
+                dist_km = dist_m / 1000
+                cumulative_distance += dist_km
+                
+                pitch = df.iloc[i]['pitch']
+                gradient_class = self.classify_gradient(pitch)
+                fuel_rate = self.fuel_rates.get(gradient_class, 0.65)
+                segment_fuel = dist_km * fuel_rate
+                cumulative_fuel += segment_fuel
+                
+            except:
+                distances.append(0)
+        
+        df['distance_m'] = distances
+        df['distance_km'] = df['distance_m'] / 1000
+        df['cumulative_distance_km'] = cumulative_distance
+        df['cumulative_fuel_l'] = cumulative_fuel
+        df['gradient_class'] = df['pitch'].apply(self.classify_gradient)
+        df['fuel_l'] = df.apply(lambda row: row['distance_km'] * self.fuel_rates.get(row['gradient_class'], 0.65), axis=1)
+        df['in_maintenance'] = df.apply(lambda row: self.is_in_maintenance_area(row['lat'], row['lon']), axis=1)
+        df['in_working_area'] = df.apply(lambda row: self.is_in_working_area(row['lat'], row['lon']), axis=1)
+        
+        return df
+    
+    def detect_real_trips(self, df):
+        trips = []
+        current_trip = 0
+        in_trip = False
+        trip_distance = 0
+        left_working_area = False
+        
+        for i in range(len(df)):
+            lat, lon = df.iloc[i]['lat'], df.iloc[i]['lon']
+            in_maintenance = df.iloc[i]['in_maintenance']
+            in_working = df.iloc[i]['in_working_area']
+            
+            if lat == 0 or lon == 0:
+                trips.append(current_trip if in_trip else 0)
+                continue
+            
+            if in_maintenance:
+                if in_trip:
+                    if trip_distance >= self.min_trip_distance_km and left_working_area:
+                        trips.append(current_trip)
+                    else:
+                        trips.append(0)
+                        current_trip -= 1
+                    in_trip = False
+                    trip_distance = 0
+                    left_working_area = False
+                else:
+                    trips.append(0)
+                continue
+            
+            if in_working:
+                if not in_trip:
+                    trips.append(0)
+                elif in_trip and left_working_area:
+                    if trip_distance >= self.min_trip_distance_km:
+                        trips.append(current_trip)
+                    else:
+                        trips.append(0)
+                        current_trip -= 1
+                    in_trip = False
+                    trip_distance = 0
+                    left_working_area = False
+                else:
+                    trips.append(current_trip if in_trip else 0)
+                continue
+            
+            if not in_trip:
+                current_trip += 1
+                in_trip = True
+                left_working_area = True
+                trips.append(current_trip)
+            elif in_trip:
+                trip_distance += df.iloc[i]['distance_km']
+                trips.append(current_trip)
+            else:
+                trips.append(0)
+        
+        trip_counter = 0
+        last_trip = 0
+        for i in range(len(trips)):
+            if trips[i] > last_trip:
+                trip_counter += 1
+                last_trip = trips[i]
+                trips[i] = trip_counter
+            elif trips[i] == last_trip:
+                trips[i] = trip_counter
+            else:
+                trips[i] = 0
+        
+        df['trip'] = trips
+        return df
+    
+    def detect_trips(self, df):
+        return self.detect_real_trips(df)
+    
+    def detect_routes(self, df):
+        valid_coords = df[(df['lat'] != 0) & (df['lon'] != 0) & (~df['in_maintenance'])]
+        
+        if len(valid_coords) < 10:
+            return None, None
+        
+        coords = valid_coords[['lat', 'lon']].values
+        
+        try:
+            eps = 0.0001
+            min_samples = 30
+            db = DBSCAN(eps=eps, min_samples=min_samples).fit(coords)
+            valid_coords = valid_coords.copy()
+            valid_coords['route_cluster'] = db.labels_
+            
+            route_clusters = valid_coords[valid_coords['route_cluster'] != -1]
+            
+            if len(route_clusters) == 0:
+                return None, None
+            
+            cluster_sizes = route_clusters.groupby('route_cluster').size().sort_values(ascending=False)
+            
+            routes = {}
+            for i, (cluster_id, size) in enumerate(cluster_sizes.items()):
+                if i >= 2:
+                    break
+                
+                cluster_data = route_clusters[route_clusters['route_cluster'] == cluster_id]
+                
+                route_distance = cluster_data['distance_km'].sum() if 'distance_km' in cluster_data.columns else 0
+                route_fuel = cluster_data['fuel_l'].sum() if 'fuel_l' in cluster_data.columns else 0
+                route_cost = route_fuel * self.diesel_price
+                
+                if 'pitch' in cluster_data.columns:
+                    avg_pitch = cluster_data['pitch'].mean()
+                    if avg_pitch > 8:
+                        grade = "Steep Up"
+                    elif avg_pitch > 3:
+                        grade = "Mild Up"
+                    elif avg_pitch > -3:
+                        grade = "Flat"
+                    elif avg_pitch > -8:
+                        grade = "Mild Down"
+                    else:
+                        grade = "Steep Down"
+                else:
+                    avg_pitch = 0
+                    grade = "Unknown"
+                
+                fuel_per_km = route_fuel / route_distance if route_distance > 0 else 0
+                route_name = f"Route {chr(65 + i)}"
+                
+                routes[route_name] = {
+                    'route_id': int(cluster_id),
+                    'distance_km': round(route_distance, 2),
+                    'fuel_l': round(route_fuel, 2),
+                    'cost_rs': round(route_cost, 2),
+                    'fuel_per_km': round(fuel_per_km, 3),
+                    'avg_pitch': round(avg_pitch, 1),
+                    'grade': grade,
+                    'points': len(cluster_data),
+                    'percentage_of_travel': round(len(cluster_data) / len(valid_coords) * 100, 1)
+                }
+            
+            return routes.get('Route A'), routes.get('Route B')
+            
+        except Exception as e:
+            return None, None
+    
+    def calculate_total_hours(self, df):
+        if 'time' not in df.columns or len(df) < 2:
+            return 0
+        
+        try:
+            start_time = df.iloc[0]['time']
+            end_time = df.iloc[-1]['time']
+            total_seconds = (end_time - start_time).total_seconds()
+            total_hours = total_seconds / 3600
+            
+            moving_mask = (df['speed'] > 2) & (df['lat'] != 0) & (~df['in_maintenance'])
+            moving_points = len(df[moving_mask])
+            total_points = len(df[df['lat'] != 0])
+            
+            if total_points > 0:
+                operating_hours = (moving_points / total_points) * total_hours
+            else:
+                operating_hours = total_hours
+            
+            return round(operating_hours, 2)
+        except:
+            return 0
+    
+    def calculate_lead_and_lift(self, df, trip_numbers):
+        lead_distances = []
+        lift_elevations = []
+        
+        if 'rl' in df.columns:
+            elevation_col = 'rl'
+        else:
+            elevation_col = 'alt'
+        
+        for trip_num in trip_numbers:
+            trip_df = df[df['trip'] == trip_num]
+            
+            if len(trip_df) < 5:
+                continue
+            
+            working_area_points = trip_df[trip_df['in_working_area'] == True]
+            if len(working_area_points) > 0:
+                loading_point = working_area_points.loc[working_area_points[elevation_col].idxmin()]
+            else:
+                loading_point = trip_df.iloc[0]
+            
+            maintenance_points = trip_df[trip_df['in_maintenance'] == True]
+            if len(maintenance_points) > 0:
+                dumping_point = maintenance_points.loc[maintenance_points[elevation_col].idxmax()]
+            else:
+                dumping_point = trip_df.loc[trip_df[elevation_col].idxmax()]
+            
+            loading_elevation = loading_point.get(elevation_col, 0)
+            dumping_elevation = dumping_point.get(elevation_col, 0)
+            loading_lat = loading_point.get('lat', 0)
+            loading_lon = loading_point.get('lon', 0)
+            dumping_lat = dumping_point.get('lat', 0)
+            dumping_lon = dumping_point.get('lon', 0)
+            
+            try:
+                if loading_lat != 0 and loading_lon != 0 and dumping_lat != 0 and dumping_lon != 0:
+                    lead_distance_km = geodesic(
+                        (loading_lat, loading_lon), 
+                        (dumping_lat, dumping_lon)
+                    ).kilometers
+                else:
+                    lead_distance_km = trip_df['distance_km'].sum() / 2
+            except:
+                lead_distance_km = trip_df['distance_km'].sum() / 2
+            
+            if loading_elevation != 0 and dumping_elevation != 0:
+                lift_meters = dumping_elevation - loading_elevation
+            else:
+                lift_meters = 0
+            
+            if abs(lift_meters) > 200:
+                lift_meters = 100 if lift_meters > 0 else -100
+            
+            if lead_distance_km > 20:
+                lead_distance_km = 10
+            
+            lead_distances.append(lead_distance_km)
+            lift_elevations.append(lift_meters)
+        
+        avg_lead = sum(lead_distances) / len(lead_distances) if lead_distances else 0
+        avg_lift = sum(lift_elevations) / len(lift_elevations) if lift_elevations else 0
+        total_lead = sum(lead_distances)
+        total_lift = sum(lift_elevations)
+        
+        return {
+            'avg_lead_km': round(avg_lead, 2),
+            'avg_lift_m': round(avg_lift, 1),
+            'total_lead_km': round(total_lead, 2),
+            'total_lift_m': round(total_lift, 1)
+        }
+    
+    def analyze_shift_data(self, df, shift_name=""):
+        if len(df) < 3:
+            return None
+        
+        try:
+            required_cols = ['lat', 'lon', 'pitch', 'speed', 'alt']
+            for col in required_cols:
+                if col not in df.columns:
+                    df[col] = 0
+            
+            if 'rl' in df.columns:
+                df['alt'] = df['rl']
+            
+            df['pitch'] = pd.to_numeric(df['pitch'], errors='coerce').fillna(0)
+            df.loc[df['pitch'] > 30, 'pitch'] = df.loc[df['pitch'] > 30, 'pitch'] - 90
+            df.loc[df['pitch'] < -30, 'pitch'] = df.loc[df['pitch'] < -30, 'pitch'] + 90
+            
+            df = self.calculate_distance_and_fuel(df)
+            df = self.detect_trips(df)
+            route_a, route_b = self.detect_routes(df)
+            
+            maintenance_records = df[df['in_maintenance'] == True]
+            maintenance_minutes = len(maintenance_records) if 'time' in df.columns else 0
+            total_time = len(df)
+            maintenance_percentage = (maintenance_minutes / total_time * 100) if total_time > 0 else 0
+            
+            valid_gps = df[(df['lat'] != 0) & (df['lon'] != 0) & (df['distance_km'] > 0)]
+            
+            if len(valid_gps) == 0:
+                return None
+            
+            total_distance = valid_gps['distance_km'].sum()
+            total_fuel = valid_gps['fuel_l'].sum()
+            total_cost = total_fuel * self.diesel_price
+            
+            valid_trips = []
+            trip_details = []
+            total_trip_distance = 0
+            total_trip_fuel = 0
+            slow_trips = []
+            
+            for trip_num in sorted(df[df['trip'] > 0]['trip'].unique()):
+                if len(valid_trips) >= self.max_trips_per_shift:
+                    break
+                    
+                trip_data = df[df['trip'] == trip_num]
+                
+                if len(trip_data) < 5:
+                    continue
+                
+                trip_distance = trip_data['distance_km'].sum()
+                
+                if trip_distance < self.min_trip_distance_km:
+                    continue
+                
+                trip_fuel = trip_data['fuel_l'].sum()
+                trip_cost = trip_fuel * self.diesel_price
+                
+                total_trip_distance += trip_distance
+                total_trip_fuel += trip_fuel
+                valid_trips.append(trip_num)
+                
+                trip_duration_hours = 0
+                if 'time' in trip_data.columns and len(trip_data) > 1:
+                    time_diff = trip_data.iloc[-1]['time'] - trip_data.iloc[0]['time']
+                    trip_duration_hours = time_diff.total_seconds() / 3600
+                    
+                    if trip_duration_hours > 1:
+                        slow_trips.append({
+                            'trip_num': int(trip_num),
+                            'duration_hours': round(trip_duration_hours, 2),
+                            'distance_km': round(trip_distance, 2),
+                            'fuel_l': round(trip_fuel, 2)
+                        })
+                
+                avg_speed = trip_data['speed'].mean() if 'speed' in trip_data.columns else 0
+                if avg_speed > self.max_realistic_speed:
+                    avg_speed = self.max_realistic_speed
+                
+                trip_details.append({
+                    'trip_number': int(trip_num),
+                    'start_time': str(trip_data.iloc[0]['time']) if 'time' in trip_data.columns else 'N/A',
+                    'end_time': str(trip_data.iloc[-1]['time']) if 'time' in trip_data.columns else 'N/A',
+                    'duration_hours': round(trip_duration_hours, 2),
+                    'duration_minutes': round(trip_duration_hours * 60, 2),
+                    'distance_km': round(float(trip_distance), 2),
+                    'fuel_l': round(float(trip_fuel), 2),
+                    'cost_rs': round(float(trip_cost), 2),
+                    'avg_speed': round(float(avg_speed), 1)
+                })
+            
+            unique_trips = len(valid_trips)
+            total_tons = unique_trips * self.ton_per_trip
+            
+            lead_lift_data = self.calculate_lead_and_lift(df, valid_trips)
+            
+            operating_time_hours = self.calculate_total_hours(df)
+            total_time_hours = 0
+            
+            if 'time' in df.columns and len(df) > 1:
+                time_span = df.iloc[-1]['time'] - df.iloc[0]['time']
+                total_time_hours = time_span.total_seconds() / 3600
+            
+            # Use 8 hours for shift
+            total_shift_hours = 8.0
+            trips_per_hour = unique_trips / total_shift_hours if total_shift_hours > 0 else 0
+            
+            if trips_per_hour > 1.8:
+                trips_per_hour = 1.8
+            
+            trips_per_km = unique_trips / total_distance if total_distance > 0 else 0
+            fuel_per_hour = total_fuel / total_shift_hours if total_shift_hours > 0 else 0
+            fuel_per_km = total_fuel / total_distance if total_distance > 0 else 0
+            fuel_per_trip = total_fuel / unique_trips if unique_trips > 0 else 0
+            
+            target_met = trips_per_hour >= 1.5
+            target_status = "✓ Target Met (≥1.5 trips/hr)" if target_met else "✗ Target Not Met (<1.5 trips/hr)"
+            
+            moving = df[(df['speed'] > 2) & (df['lat'] != 0) & (~df['in_maintenance'])]
+            avg_speed = float(moving['speed'].mean()) if len(moving) > 0 else 0
+            if avg_speed > self.max_realistic_speed:
+                avg_speed = self.max_realistic_speed
+            
+            gradient_stats = {}
+            
+            steep_up_mask = df['gradient_class'] == 'Steep Up'
+            steep_up_data = df[steep_up_mask]
+            steep_up_distance = steep_up_data['distance_km'].sum()
+            steep_up_fuel = steep_up_data['fuel_l'].sum()
+            steep_up_speed = steep_up_data['speed'].mean() if len(steep_up_data) > 0 else 0
+            steep_up_time = steep_up_distance / steep_up_speed if steep_up_speed > 0 else 0
+            
+            steep_down_mask = df['gradient_class'] == 'Steep Down'
+            steep_down_data = df[steep_down_mask]
+            steep_down_distance = steep_down_data['distance_km'].sum()
+            steep_down_fuel = steep_down_data['fuel_l'].sum()
+            steep_down_speed = steep_down_data['speed'].mean() if len(steep_down_data) > 0 else 0
+            steep_down_time = steep_down_distance / steep_down_speed if steep_down_speed > 0 else 0
+            
+            flat_mask = df['gradient_class'] == 'Flat'
+            flat_data = df[flat_mask]
+            flat_distance = flat_data['distance_km'].sum()
+            flat_fuel = flat_data['fuel_l'].sum()
+            flat_speed = flat_data['speed'].mean() if len(flat_data) > 0 else 0
+            flat_time = flat_distance / flat_speed if flat_speed > 0 else 0
+            
+            mild_up_mask = df['gradient_class'] == 'Mild Up'
+            mild_up_data = df[mild_up_mask]
+            flat_distance += mild_up_data['distance_km'].sum()
+            flat_fuel += mild_up_data['fuel_l'].sum()
+            
+            mild_down_mask = df['gradient_class'] == 'Mild Down'
+            mild_down_data = df[mild_down_mask]
+            flat_distance += mild_down_data['distance_km'].sum()
+            flat_fuel += mild_down_data['fuel_l'].sum()
+            
+            gradient_stats['Steep Up'] = {
+                'distance_km': round(steep_up_distance, 2),
+                'fuel_l': round(steep_up_fuel, 2),
+                'speed_kmhr': round(steep_up_speed, 1),
+                'time_hr': round(steep_up_time, 2),
+                'cost_rs': round(steep_up_fuel * self.diesel_price, 2),
+                'percentage': round(steep_up_distance / total_distance * 100, 1) if total_distance > 0 else 0
+            }
+            
+            gradient_stats['Steep Down'] = {
+                'distance_km': round(steep_down_distance, 2),
+                'fuel_l': round(steep_down_fuel, 2),
+                'speed_kmhr': round(steep_down_speed, 1),
+                'time_hr': round(steep_down_time, 2),
+                'cost_rs': round(steep_down_fuel * self.diesel_price, 2),
+                'percentage': round(steep_down_distance / total_distance * 100, 1) if total_distance > 0 else 0
+            }
+            
+            gradient_stats['Flat'] = {
+                'distance_km': round(flat_distance, 2),
+                'fuel_l': round(flat_fuel, 2),
+                'speed_kmhr': round(flat_speed, 1),
+                'time_hr': round(flat_time, 2),
+                'cost_rs': round(flat_fuel * self.diesel_price, 2),
+                'percentage': round(flat_distance / total_distance * 100, 1) if total_distance > 0 else 0
+            }
+            
+            idle_points = len(df[(df['speed'] <= 2) & (df['lat'] != 0) & (~df['in_maintenance'])]) if 'speed' in df.columns else 0
+            total_points = len(df[(df['lat'] != 0)])
+            idle_ratio = idle_points / total_points if total_points > 0 else 0
+            
+            if idle_ratio > 0.4:
+                idle_pattern = "High Idle Time"
+            elif idle_ratio > 0.2:
+                idle_pattern = "Medium Idle Time"
+            else:
+                idle_pattern = "Low Idle Time"
+            
+            steep_up_pct = gradient_stats.get('Steep Up', {}).get('percentage', 0)
+            
+            if steep_up_pct > 30:
+                route_type = "Steep Route (High Grade)"
+                route_chars = "High fuel consumption, low speed, frequent steep climbs"
+            elif steep_up_pct > 15:
+                route_type = "Mixed Terrain"
+                route_chars = "Moderate fuel consumption, balanced speed"
+            else:
+                route_type = "Gentle Route"
+                route_chars = "Optimal fuel efficiency, good speed"
+            
+            if fuel_per_km < 0.4:
+                fuel_efficiency_rating = "Excellent"
+            elif fuel_per_km < 0.65:
+                fuel_efficiency_rating = "Good"
+            elif fuel_per_km < 0.85:
+                fuel_efficiency_rating = "Average"
+            else:
+                fuel_efficiency_rating = "Needs Improvement"
+            
+            return {
+                'total_distance': round(total_distance, 1),
+                'total_fuel': round(total_fuel, 1),
+                'total_cost': round(total_cost, 2),
+                'total_tons': total_tons,
+                'cost_rs': round(total_cost, 2),
+                'fuel_per_km': round(fuel_per_km, 2),
+                'fuel_per_hour': round(fuel_per_hour, 1),
+                'fuel_per_trip': round(fuel_per_trip, 1),
+                'trips': unique_trips,
+                'trips_per_hour': round(trips_per_hour, 2),
+                'trips_per_km': round(trips_per_km, 3),
+                'total_trip_distance': round(total_trip_distance, 1),
+                'total_trip_fuel': round(total_trip_fuel, 1),
+                'avg_speed': round(avg_speed, 1),
+                'fuel_efficiency_rating': fuel_efficiency_rating,
+                'gradient_stats': gradient_stats,
+                'idle_pattern': idle_pattern,
+                'idle_ratio': round(idle_ratio * 100, 1),
+                'route_type': route_type,
+                'route_chars': route_chars,
+                'steep_up_percentage': round(steep_up_pct, 1),
+                'trip_details': trip_details[:20],
+                'route_a': route_a,
+                'route_b': route_b,
+                'maintenance_time_minutes': round(maintenance_minutes, 1),
+                'maintenance_time_pct': round(maintenance_percentage, 1),
+                'in_maintenance': maintenance_percentage > 0,
+                'target_status': target_status,
+                'target_met': target_met,
+                'slow_trips': slow_trips,
+                'total_time_hours': round(total_time_hours, 2),
+                'operating_time_hours': operating_time_hours,
+                'total_hours': total_shift_hours,
+                'total_shift_hours': total_shift_hours,
+                'avg_lead_km': lead_lift_data.get('avg_lead_km', 0),
+                'avg_lift_m': lead_lift_data.get('avg_lift_m', 0),
+                'total_lead_km': lead_lift_data.get('total_lead_km', 0),
+                'total_lift_m': lead_lift_data.get('total_lift_m', 0)
+            }
+            
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return None
+    
+    def analyze_daily_data(self, df):
+        if len(df) < 3:
+            return None
+        
+        try:
+            required_cols = ['lat', 'lon', 'pitch', 'speed', 'alt']
+            for col in required_cols:
+                if col not in df.columns:
+                    df[col] = 0
+            
+            if 'rl' in df.columns:
+                df['alt'] = df['rl']
+            
+            df['pitch'] = pd.to_numeric(df['pitch'], errors='coerce').fillna(0)
+            df.loc[df['pitch'] > 30, 'pitch'] = df.loc[df['pitch'] > 30, 'pitch'] - 90
+            df.loc[df['pitch'] < -30, 'pitch'] = df.loc[df['pitch'] < -30, 'pitch'] + 90
+            
+            df = self.calculate_distance_and_fuel(df)
+            df = self.detect_trips(df)
+            route_a, route_b = self.detect_routes(df)
+            
+            maintenance_records = df[df['in_maintenance'] == True]
+            maintenance_minutes = len(maintenance_records) if 'time' in df.columns else 0
+            total_time = len(df)
+            maintenance_percentage = (maintenance_minutes / total_time * 100) if total_time > 0 else 0
+            
+            valid_gps = df[(df['lat'] != 0) & (df['lon'] != 0) & (df['distance_km'] > 0)]
+            
+            if len(valid_gps) == 0:
+                return None
+            
+            total_distance = valid_gps['distance_km'].sum()
+            total_fuel = valid_gps['fuel_l'].sum()
+            total_cost = total_fuel * self.diesel_price
+            
+            valid_trips = []
+            trip_details = []
+            total_trip_distance = 0
+            total_trip_fuel = 0
+            slow_trips = []
+            
+            for trip_num in sorted(df[df['trip'] > 0]['trip'].unique()):
+                trip_data = df[df['trip'] == trip_num]
+                
+                if len(trip_data) < 5:
+                    continue
+                
+                trip_distance = trip_data['distance_km'].sum()
+                
+                if trip_distance < self.min_trip_distance_km:
+                    continue
+                
+                trip_fuel = trip_data['fuel_l'].sum()
+                trip_cost = trip_fuel * self.diesel_price
+                
+                total_trip_distance += trip_distance
+                total_trip_fuel += trip_fuel
+                valid_trips.append(trip_num)
+                
+                trip_duration_hours = 0
+                if 'time' in trip_data.columns and len(trip_data) > 1:
+                    time_diff = trip_data.iloc[-1]['time'] - trip_data.iloc[0]['time']
+                    trip_duration_hours = time_diff.total_seconds() / 3600
+                    
+                    if trip_duration_hours > 1.5:
+                        slow_trips.append({
+                            'trip_num': int(trip_num),
+                            'duration_hours': round(trip_duration_hours, 2),
+                            'distance_km': round(trip_distance, 2),
+                            'fuel_l': round(trip_fuel, 2)
+                        })
+                
+                avg_speed = trip_data['speed'].mean() if 'speed' in trip_data.columns else 0
+                if avg_speed > self.max_realistic_speed:
+                    avg_speed = self.max_realistic_speed
+                
+                trip_details.append({
+                    'trip_number': int(trip_num),
+                    'start_time': str(trip_data.iloc[0]['time']) if 'time' in trip_data.columns else 'N/A',
+                    'end_time': str(trip_data.iloc[-1]['time']) if 'time' in trip_data.columns else 'N/A',
+                    'duration_hours': round(trip_duration_hours, 2),
+                    'duration_minutes': round(trip_duration_hours * 60, 2),
+                    'distance_km': round(float(trip_distance), 2),
+                    'fuel_l': round(float(trip_fuel), 2),
+                    'cost_rs': round(float(trip_cost), 2),
+                    'avg_speed': round(float(avg_speed), 1)
+                })
+            
+            unique_trips = len(valid_trips)
+            total_tons = unique_trips * self.ton_per_trip
+            
+            lead_lift_data = self.calculate_lead_and_lift(df, valid_trips)
+            
+            operating_time_hours = self.calculate_total_hours(df)
+            total_time_hours = 0
+            
+            if 'time' in df.columns and len(df) > 1:
+                time_span = df.iloc[-1]['time'] - df.iloc[0]['time']
+                total_time_hours = time_span.total_seconds() / 3600
+            
+            # Use 24 hours for daily
+            total_day_hours = 24.0
+            trips_per_hour = unique_trips / total_day_hours if total_day_hours > 0 else 0
+            
+            if trips_per_hour > 1.5:
+                trips_per_hour = 1.5
+            
+            trips_per_km = unique_trips / total_distance if total_distance > 0 else 0
+            fuel_per_hour = total_fuel / total_day_hours if total_day_hours > 0 else 0
+            fuel_per_km = total_fuel / total_distance if total_distance > 0 else 0
+            fuel_per_trip = total_fuel / unique_trips if unique_trips > 0 else 0
+            
+            target_met = trips_per_hour >= 1.5
+            
+            moving = df[(df['speed'] > 2) & (df['lat'] != 0) & (~df['in_maintenance'])]
+            avg_speed = float(moving['speed'].mean()) if len(moving) > 0 else 0
+            if avg_speed > self.max_realistic_speed:
+                avg_speed = self.max_realistic_speed
+            
+            gradient_stats = {}
+            
+            steep_up_mask = df['gradient_class'] == 'Steep Up'
+            steep_up_data = df[steep_up_mask]
+            steep_up_distance = steep_up_data['distance_km'].sum()
+            steep_up_fuel = steep_up_data['fuel_l'].sum()
+            steep_up_speed = steep_up_data['speed'].mean() if len(steep_up_data) > 0 else 0
+            steep_up_time = steep_up_distance / steep_up_speed if steep_up_speed > 0 else 0
+            
+            steep_down_mask = df['gradient_class'] == 'Steep Down'
+            steep_down_data = df[steep_down_mask]
+            steep_down_distance = steep_down_data['distance_km'].sum()
+            steep_down_fuel = steep_down_data['fuel_l'].sum()
+            steep_down_speed = steep_down_data['speed'].mean() if len(steep_down_data) > 0 else 0
+            steep_down_time = steep_down_distance / steep_down_speed if steep_down_speed > 0 else 0
+            
+            flat_mask = df['gradient_class'] == 'Flat'
+            flat_data = df[flat_mask]
+            flat_distance = flat_data['distance_km'].sum()
+            flat_fuel = flat_data['fuel_l'].sum()
+            flat_speed = flat_data['speed'].mean() if len(flat_data) > 0 else 0
+            flat_time = flat_distance / flat_speed if flat_speed > 0 else 0
+            
+            mild_up_mask = df['gradient_class'] == 'Mild Up'
+            mild_up_data = df[mild_up_mask]
+            flat_distance += mild_up_data['distance_km'].sum()
+            flat_fuel += mild_up_data['fuel_l'].sum()
+            
+            mild_down_mask = df['gradient_class'] == 'Mild Down'
+            mild_down_data = df[mild_down_mask]
+            flat_distance += mild_down_data['distance_km'].sum()
+            flat_fuel += mild_down_data['fuel_l'].sum()
+            
+            gradient_stats['Steep Up'] = {
+                'distance_km': round(steep_up_distance, 2),
+                'fuel_l': round(steep_up_fuel, 2),
+                'speed_kmhr': round(steep_up_speed, 1),
+                'time_hr': round(steep_up_time, 2)
+            }
+            
+            gradient_stats['Steep Down'] = {
+                'distance_km': round(steep_down_distance, 2),
+                'fuel_l': round(steep_down_fuel, 2),
+                'speed_kmhr': round(steep_down_speed, 1),
+                'time_hr': round(steep_down_time, 2)
+            }
+            
+            gradient_stats['Flat'] = {
+                'distance_km': round(flat_distance, 2),
+                'fuel_l': round(flat_fuel, 2),
+                'speed_kmhr': round(flat_speed, 1),
+                'time_hr': round(flat_time, 2)
+            }
+            
+            idle_points = len(df[(df['speed'] <= 2) & (df['lat'] != 0) & (~df['in_maintenance'])]) if 'speed' in df.columns else 0
+            total_points = len(df[(df['lat'] != 0)])
+            idle_ratio = idle_points / total_points if total_points > 0 else 0
+            
+            if idle_ratio > 0.4:
+                idle_pattern = "High Idle Time"
+            elif idle_ratio > 0.2:
+                idle_pattern = "Medium Idle Time"
+            else:
+                idle_pattern = "Low Idle Time"
+            
+            steep_up_pct = steep_up_distance / total_distance * 100 if total_distance > 0 else 0
+            
+            if steep_up_pct > 30:
+                route_type = "Steep Route (High Grade)"
+            elif steep_up_pct > 15:
+                route_type = "Mixed Terrain"
+            else:
+                route_type = "Gentle Route"
+            
+            if fuel_per_km < 0.4:
+                fuel_efficiency_rating = "Excellent"
+            elif fuel_per_km < 0.65:
+                fuel_efficiency_rating = "Good"
+            elif fuel_per_km < 0.85:
+                fuel_efficiency_rating = "Average"
+            else:
+                fuel_efficiency_rating = "Needs Improvement"
+            
+            return {
+                'total_distance': round(total_distance, 1),
+                'total_fuel': round(total_fuel, 1),
+                'total_cost': round(total_cost, 2),
+                'total_tons': total_tons,
+                'fuel_per_km': round(fuel_per_km, 2),
+                'fuel_per_hour': round(fuel_per_hour, 1),
+                'fuel_per_trip': round(fuel_per_trip, 1),
+                'trips': unique_trips,
+                'trips_per_hour': round(trips_per_hour, 2),
+                'trips_per_km': round(trips_per_km, 3),
+                'avg_speed': round(avg_speed, 1),
+                'fuel_efficiency_rating': fuel_efficiency_rating,
+                'gradient_stats': gradient_stats,
+                'idle_pattern': idle_pattern,
+                'idle_ratio': round(idle_ratio * 100, 1),
+                'route_type': route_type,
+                'trip_details': trip_details[:50],
+                'route_a': route_a,
+                'route_b': route_b,
+                'maintenance_time_minutes': round(maintenance_minutes, 1),
+                'maintenance_time_pct': round(maintenance_percentage, 1),
+                'target_met': target_met,
+                'total_time_hours': round(total_time_hours, 2),
+                'operating_time_hours': operating_time_hours,
+                'total_hours': total_day_hours,
+                'total_day_hours': total_day_hours,
+                'avg_lead_km': lead_lift_data.get('avg_lead_km', 0),
+                'avg_lift_m': lead_lift_data.get('avg_lift_m', 0),
+                'total_lead_km': lead_lift_data.get('total_lead_km', 0),
+                'total_lift_m': lead_lift_data.get('total_lift_m', 0)
+            }
+            
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return None
+    
+    def analyze_monthly_data(self, df):
+        if len(df) < 3:
+            return None
+        
+        try:
+            if 'time' not in df.columns:
+                return self.analyze_daily_data(df)
+            
+            df['date'] = df['time'].dt.date
+            unique_dates = df['date'].unique()
+            
+            if len(unique_dates) == 0:
+                return self.analyze_daily_data(df)
+            
+            print(f"Analyzing {len(unique_dates)} days for monthly report", file=sys.stderr)
+            
+            daily_results = []
+            
+            for date in unique_dates:
+                daily_df = df[df['date'] == date].copy()
+                
+                if len(daily_df) < 10:
+                    continue
+                
+                daily_result = self.analyze_daily_data(daily_df)
+                
+                if daily_result:
+                    daily_results.append(daily_result)
+            
+            if not daily_results:
+                return self.analyze_daily_data(df)
+            
+            total_trips = sum(r.get('trips', 0) for r in daily_results)
+            total_distance = sum(r.get('total_distance', 0) for r in daily_results)
+            total_fuel = sum(r.get('total_fuel', 0) for r in daily_results)
+            total_cost = sum(r.get('total_cost', 0) for r in daily_results)
+            total_days = len(daily_results)
+            
+            total_shift_hours = total_days * 8.0
+            trips_per_hour = total_trips / total_shift_hours if total_shift_hours > 0 else 0
+            
+            if trips_per_hour > 1.8:
+                trips_per_hour = 1.8
+            
+            avg_fuel_per_km = total_fuel / total_distance if total_distance > 0 else 0
+            avg_fuel_per_hour = total_fuel / total_shift_hours if total_shift_hours > 0 else 0
+            avg_fuel_per_trip = total_fuel / total_trips if total_trips > 0 else 0
+            avg_trips_per_km = total_trips / total_distance if total_distance > 0 else 0
+            
+            total_distance_weighted_speed = sum(r.get('total_distance', 0) * r.get('avg_speed', 0) for r in daily_results)
+            avg_speed = total_distance_weighted_speed / total_distance if total_distance > 0 else 0
+            
+            gradient_stats = {
+                'Steep Up': {'distance_km': 0, 'fuel_l': 0, 'time_hr': 0},
+                'Steep Down': {'distance_km': 0, 'fuel_l': 0, 'time_hr': 0},
+                'Flat': {'distance_km': 0, 'fuel_l': 0, 'time_hr': 0}
+            }
+            
+            for r in daily_results:
+                grad_stats = r.get('gradient_stats', {})
+                for grad_type in ['Steep Up', 'Steep Down', 'Flat']:
+                    if grad_type in grad_stats:
+                        gradient_stats[grad_type]['distance_km'] += grad_stats[grad_type].get('distance_km', 0)
+                        gradient_stats[grad_type]['fuel_l'] += grad_stats[grad_type].get('fuel_l', 0)
+                        gradient_stats[grad_type]['time_hr'] += grad_stats[grad_type].get('time_hr', 0)
+            
+            for grad_type in gradient_stats:
+                dist = gradient_stats[grad_type]['distance_km']
+                fuel = gradient_stats[grad_type]['fuel_l']
+                time_hr = gradient_stats[grad_type]['time_hr']
+                
+                gradient_stats[grad_type]['speed_kmhr'] = round(dist / time_hr, 1) if time_hr > 0 else 0
+                gradient_stats[grad_type]['cost_rs'] = round(fuel * self.diesel_price, 2)
+                gradient_stats[grad_type]['percentage'] = round(dist / total_distance * 100, 1) if total_distance > 0 else 0
+            
+            avg_idle_ratio = sum(r.get('idle_ratio', 0) for r in daily_results) / len(daily_results) if daily_results else 0
+            
+            if avg_idle_ratio > 40:
+                idle_pattern = "High Idle Time"
+            elif avg_idle_ratio > 20:
+                idle_pattern = "Medium Idle Time"
+            else:
+                idle_pattern = "Low Idle Time"
+            
+            steep_up_pct = gradient_stats['Steep Up']['percentage']
+            if steep_up_pct > 30:
+                route_type = "Steep Route (High Grade)"
+            elif steep_up_pct > 15:
+                route_type = "Mixed Terrain"
+            else:
+                route_type = "Gentle Route"
+            
+            if avg_fuel_per_km < 0.4:
+                fuel_efficiency_rating = "Excellent"
+            elif avg_fuel_per_km < 0.65:
+                fuel_efficiency_rating = "Good"
+            elif avg_fuel_per_km < 0.85:
+                fuel_efficiency_rating = "Average"
+            else:
+                fuel_efficiency_rating = "Needs Improvement"
+            
+            target_met = trips_per_hour >= 1.5
+            
+            all_trip_details = []
+            for r in daily_results:
+                all_trip_details.extend(r.get('trip_details', []))
+                if len(all_trip_details) >= 50:
+                    break
+            
+            route_a = None
+            route_b = None
+            for r in daily_results:
+                if r.get('route_a'):
+                    route_a = r.get('route_a')
+                    route_b = r.get('route_b')
+                    break
+            
+            avg_lead_km = sum(r.get('avg_lead_km', 0) for r in daily_results) / len(daily_results) if daily_results else 0
+            avg_lift_m = sum(r.get('avg_lift_m', 0) for r in daily_results) / len(daily_results) if daily_results else 0
+            total_lead_km = sum(r.get('total_lead_km', 0) for r in daily_results)
+            total_lift_m = sum(r.get('total_lift_m', 0) for r in daily_results)
+            
+            return {
+                'total_distance': round(total_distance, 1),
+                'total_fuel': round(total_fuel, 1),
+                'total_cost': round(total_cost, 2),
+                'total_tons': total_trips * self.ton_per_trip,
+                'cost_rs': round(total_cost, 2),
+                'fuel_per_km': round(avg_fuel_per_km, 2),
+                'fuel_per_hour': round(avg_fuel_per_hour, 1),
+                'fuel_per_trip': round(avg_fuel_per_trip, 1),
+                'trips': total_trips,
+                'trips_per_hour': round(trips_per_hour, 2),
+                'trips_per_km': round(avg_trips_per_km, 4),
+                'avg_speed': round(avg_speed, 1),
+                'fuel_efficiency_rating': fuel_efficiency_rating,
+                'gradient_stats': gradient_stats,
+                'idle_pattern': idle_pattern,
+                'idle_ratio': round(avg_idle_ratio, 1),
+                'route_type': route_type,
+                'trip_details': all_trip_details[:50],
+                'route_a': route_a,
+                'route_b': route_b,
+                'target_met': target_met,
+                'total_shift_hours': round(total_shift_hours, 2),
+                'total_hours': round(total_shift_hours, 2),
+                'number_of_days': total_days,
+                'avg_lead_km': round(avg_lead_km, 2),
+                'avg_lift_m': round(avg_lift_m, 1),
+                'total_lead_km': round(total_lead_km, 2),
+                'total_lift_m': round(total_lift_m, 1)
+            }
+            
+        except Exception as e:
+            print(f"Error in analyze_monthly_data: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            return self.analyze_daily_data(df)
+    
+    def analyze_excavator_data(self, df):
+        if len(df) < 3:
+            return None
+        
+        try:
+            df = self.calculate_distance_and_fuel(df)
+            
+            maintenance_records = df[df['in_maintenance'] == True]
+            maintenance_minutes = len(maintenance_records) if 'time' in df.columns else 0
+            total_time = len(df)
+            maintenance_percentage = (maintenance_minutes / total_time * 100) if total_time > 0 else 0
+            
+            valid_gps = df[(df['lat'] != 0) & (df['lon'] != 0) & (df['distance_km'] > 0)]
+            
+            if len(valid_gps) == 0:
+                return None
+            
+            total_distance = valid_gps['distance_km'].sum()
+            total_fuel = valid_gps['fuel_l'].sum()
+            total_cost = total_fuel * self.diesel_price
+            
+            idle_points = len(df[(df['speed'] <= 2) & (df['lat'] != 0) & (~df['in_maintenance'])]) if 'speed' in df.columns else 0
+            total_points = len(df[(df['lat'] != 0)])
+            idle_ratio = idle_points / total_points if total_points > 0 else 0
+            idle_hours = idle_ratio * (total_time / 60) if 'time' in df.columns else 0
+            running_hours = (1 - idle_ratio) * (total_time / 60) if 'time' in df.columns else 0
+            
+            operating_status = "Stationary Operation" if total_distance < 5 else "Moving Operation"
+            fuel_per_hour = total_fuel / (running_hours + idle_hours) if (running_hours + idle_hours) > 0 else 0
+            
+            return {
+                'total_distance': round(total_distance, 1),
+                #'total_fuel': round(total_fuel, 1),
+                #'total_cost': round(total_cost, 2),
+                #'fuel_per_km': round(total_fuel / total_distance, 2) if total_distance > 0 else 0,
+                #'fuel_per_hour': round(fuel_per_hour, 1),
+                'idle_hours': round(idle_hours, 2),
+                'running_hours': round(running_hours, 2),
+                'idle_ratio': round(idle_ratio * 100, 1),
+                'maintenance_time_pct': round(maintenance_percentage, 1),
+                'operating_status': operating_status
+            }
+            
+        except Exception as e:
+            return None
+    
+    def analyze_bulldozer_data(self, df):
+        if len(df) < 3:
+            return None
+        
+        try:
+            df = self.calculate_distance_and_fuel(df)
+            
+            total_hours = 0
+            operating_hours = 0
+            
+            if 'time' in df.columns and len(df) > 1:
+                time_span = df.iloc[-1]['time'] - df.iloc[0]['time']
+                total_hours = time_span.total_seconds() / 3600
+                total_points = len(df)
+                if total_points > 0:
+                    moving_points = len(df[(df['speed'] > 2) & (df['lat'] != 0) & (~df['in_maintenance'])])
+                    operating_hours = (moving_points / total_points) * total_hours
+            
+            valid_gps = df[(df['lat'] != 0) & (df['lon'] != 0) & (df['distance_km'] > 0)]
+            
+            total_distance = valid_gps['distance_km'].sum() if len(valid_gps) > 0 else 0
+            total_fuel = valid_gps['fuel_l'].sum() if len(valid_gps) > 0 else 0
+            total_cost = total_fuel * self.diesel_price
+            
+            fuel_per_hour = total_fuel / operating_hours if operating_hours > 0 else 0
+            
+            if operating_hours > total_hours * 0.3:
+                status = "Active Operation"
+            else:
+                status = "Standby/Idle"
+            
+            return {
+                'total_distance': round(total_distance, 1),
+                'total_fuel': round(total_fuel, 1),
+                'total_cost': round(total_cost, 2),
+                'operating_hours': round(operating_hours, 2),
+                'fuel_per_hour': round(fuel_per_hour, 2),
+                'status': status
+            }
+            
+        except Exception as e:
+            return None
+
+
+class ExcelReportGenerator:
+    def __init__(self):
+        self.wb = Workbook()
+        self.setup_styles()
+        self.analyzer = SimpleMiningAnalytics()
+    
+    def setup_styles(self):
+        self.header_fill = PatternFill(start_color='2C3E50', end_color='2C3E50', fill_type='solid')
+        self.header_font = Font(color='FFFFFF', bold=True, size=11)
+        self.centered = Alignment(horizontal='center', vertical='center')
+        self.right_aligned = Alignment(horizontal='right', vertical='center')
+        self.left_aligned = Alignment(horizontal='left', vertical='center')
+        self.border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+        self.good_fill = PatternFill(start_color='2ECC71', end_color='2ECC71', fill_type='solid')
+        self.bad_fill = PatternFill(start_color='E74C3C', end_color='E74C3C', fill_type='solid')
+        self.warning_fill = PatternFill(start_color='F39C12', end_color='F39C12', fill_type='solid')
+    
+    def create_hauler_summary_sheet(self, hauler_results):
+        ws = self.wb.create_sheet("Hauler Summary")
+        
+        headers = ['HAULER ID', 'Total Trips', 'Tons/Trips', 'Trips/Hr', 'Trips/Km', 'Km/Hr', 'Fuel/Hr', 'Fuel/Km', 'Fuel/Trip', 
+                   'Avg Lead (km)', 'Avg Lift (m)', 'Total Fuel', 'Total Km']
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.alignment = self.centered
+            cell.border = self.border
+        
+        row = 2
+        for device_id, data in sorted(hauler_results.items(), key=lambda x: x[1].get('total_fuel', 0), reverse=True):
+            hauler_id = self.analyzer.map_device_id(device_id)
+            trips = data.get('trips', 0)
+            tons_per_trip = data.get('total_tons', trips * 35) / trips if trips > 0 else 0
+            
+            ws.cell(row=row, column=1, value=hauler_id)
+            ws.cell(row=row, column=2, value=trips)
+            ws.cell(row=row, column=3, value=round(tons_per_trip, 1))
+            ws.cell(row=row, column=4, value=data.get('trips_per_hour', 0))
+            ws.cell(row=row, column=5, value=data.get('trips_per_km', 0))
+            ws.cell(row=row, column=6, value=data.get('avg_speed', 0))
+            ws.cell(row=row, column=7, value=data.get('fuel_per_hour', 0))
+            ws.cell(row=row, column=8, value=data.get('fuel_per_km', 0))
+            ws.cell(row=row, column=9, value=data.get('fuel_per_trip', 0))
+            ws.cell(row=row, column=10, value=data.get('avg_lead_km', 0))
+            ws.cell(row=row, column=11, value=data.get('avg_lift_m', 0))
+            ws.cell(row=row, column=12, value=data.get('total_fuel', 0))
+            ws.cell(row=row, column=13, value=data.get('total_distance', 0))
+            
+            trips_per_hour_cell = ws.cell(row=row, column=4)
+            if data.get('trips_per_hour', 0) >= 1.5:
+                trips_per_hour_cell.fill = self.good_fill
+            elif data.get('trips_per_hour', 0) >= 1.0:
+                trips_per_hour_cell.fill = self.warning_fill
+            else:
+                trips_per_hour_cell.fill = self.bad_fill
+            
+            for col in range(1, 14):
+                ws.cell(row=row, column=col).border = self.border
+                if col > 1:
+                    ws.cell(row=row, column=col).alignment = self.right_aligned
+                else:
+                    ws.cell(row=row, column=col).alignment = self.centered
+            
+            row += 1
+        
+        if hauler_results:
+            total_trips = sum(v.get('trips', 0) for v in hauler_results.values())
+            total_fuel = sum(v.get('total_fuel', 0) for v in hauler_results.values())
+            total_distance = sum(v.get('total_distance', 0) for v in hauler_results.values())
+            
+            ws.cell(row=row, column=1, value="TOTAL").font = Font(bold=True)
+            ws.cell(row=row, column=2, value=total_trips)
+            ws.cell(row=row, column=3, value=round(total_trips * 35 / len(hauler_results), 1) if hauler_results else 0)
+            ws.cell(row=row, column=12, value=round(total_fuel, 1))
+            ws.cell(row=row, column=13, value=round(total_distance, 1))
+            
+            for col in range(1, 14):
+                ws.cell(row=row, column=col).border = self.border
+                if col > 1:
+                    ws.cell(row=row, column=col).alignment = self.right_aligned
+        
+        column_widths = [12, 10, 10, 10, 10, 10, 10, 10, 12, 14, 12, 12, 12]
+        for col, width in enumerate(column_widths, 1):
+            ws.column_dimensions[get_column_letter(col)].width = width
+        
+        return ws
+    
+    def create_gradient_analysis_sheet(self, hauler_results):
+        ws = self.wb.create_sheet("Gradient Analysis")
+        
+        headers = ['Hauler Id', 'Steep Up (Km)', 'Steep Up Fuel(l)', 'Steep Up Speed (Km/hr)', 'Steep up Time',
+                   'Flat (Km)', 'Flat Fuel(l)', 'Flat Speed (Km/hr)', 'Flat Time',
+                   'Steep Down (Km)', 'Steep Down Fuel (l)', 'Steep Down Speed (Km/hr)', 'Steep Down Time']
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.alignment = self.centered
+            cell.border = self.border
+        
+        row = 2
+        for device_id, data in sorted(hauler_results.items(), key=lambda x: x[1].get('total_fuel', 0), reverse=True):
+            hauler_id = self.analyzer.map_device_id(device_id)
+            grad_stats = data.get('gradient_stats', {})
+            
+            steep_up = grad_stats.get('Steep Up', {})
+            steep_down = grad_stats.get('Steep Down', {})
+            flat = grad_stats.get('Flat', {})
+            
+            ws.cell(row=row, column=1, value=hauler_id)
+            ws.cell(row=row, column=2, value=steep_up.get('distance_km', 0))
+            ws.cell(row=row, column=3, value=steep_up.get('fuel_l', 0))
+            ws.cell(row=row, column=4, value=steep_up.get('speed_kmhr', 0))
+            ws.cell(row=row, column=5, value=steep_up.get('time_hr', 0))
+            ws.cell(row=row, column=6, value=flat.get('distance_km', 0))
+            ws.cell(row=row, column=7, value=flat.get('fuel_l', 0))
+            ws.cell(row=row, column=8, value=flat.get('speed_kmhr', data.get('avg_speed', 0)))
+            ws.cell(row=row, column=9, value=flat.get('time_hr', 0))
+            ws.cell(row=row, column=10, value=steep_down.get('distance_km', 0))
+            ws.cell(row=row, column=11, value=steep_down.get('fuel_l', 0))
+            ws.cell(row=row, column=12, value=steep_down.get('speed_kmhr', 0))
+            ws.cell(row=row, column=13, value=steep_down.get('time_hr', 0))
+            
+            for col in range(1, 14):
+                ws.cell(row=row, column=col).border = self.border
+                if col > 1:
+                    ws.cell(row=row, column=col).alignment = self.right_aligned
+                else:
+                    ws.cell(row=row, column=col).alignment = self.centered
+            
+            row += 1
+        
+        column_widths = [12, 14, 16, 20, 14, 12, 14, 20, 14, 14, 18, 20, 16]
+        for col, width in enumerate(column_widths, 1):
+            ws.column_dimensions[get_column_letter(col)].width = width
+        
+        return ws
+    
+    def create_route_taken_analysis_sheet(self, hauler_results):
+        ws = self.wb.create_sheet("Route Taken Analysis")
+        
+        headers = ['Hauler Id', 'Routes', 'Distance (Km)', 'Fuel(L)', 'Time(Hr)', 
+                   'Gradient Impact', 'Flat Segment', '% of Travel', 'Recommendation']
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.alignment = self.centered
+            cell.border = self.border
+        
+        row = 2
+        for device_id, data in sorted(hauler_results.items(), key=lambda x: x[1].get('total_fuel', 0), reverse=True):
+            hauler_id = self.analyzer.map_device_id(device_id)
+            route_a = data.get('route_a')
+            route_b = data.get('route_b')
+            
+            if route_a:
+                avg_pitch = route_a.get('avg_pitch', 0)
+                if avg_pitch > 8:
+                    gradient_impact = "High - Steep Up"
+                elif avg_pitch > 3:
+                    gradient_impact = "Medium - Mild Up"
+                elif avg_pitch > -3:
+                    gradient_impact = "Low - Flat"
+                else:
+                    gradient_impact = "Low - Downhill"
+                
+                if route_b:
+                    if route_a.get('fuel_per_km', 1) < route_b.get('fuel_per_km', 2):
+                        recommendation = "Route A is more fuel efficient"
+                    else:
+                        recommendation = "Consider Route B for better efficiency"
+                else:
+                    recommendation = "Only route detected"
+                
+                ws.cell(row=row, column=1, value=hauler_id)
+                ws.cell(row=row, column=2, value="Route A")
+                ws.cell(row=row, column=3, value=route_a.get('distance_km', 0))
+                ws.cell(row=row, column=4, value=route_a.get('fuel_l', 0))
+                ws.cell(row=row, column=5, value=round(route_a.get('distance_km', 0) / 25, 2))
+                ws.cell(row=row, column=6, value=gradient_impact)
+                ws.cell(row=row, column=7, value=route_a.get('grade', 'Unknown'))
+                ws.cell(row=row, column=8, value=route_a.get('percentage_of_travel', 0))
+                ws.cell(row=row, column=9, value=recommendation)
+                
+                for col in range(1, 10):
+                    ws.cell(row=row, column=col).border = self.border
+                
+                row += 1
+            
+            if route_b:
+                avg_pitch = route_b.get('avg_pitch', 0)
+                if avg_pitch > 8:
+                    gradient_impact = "High - Steep Up"
+                elif avg_pitch > 3:
+                    gradient_impact = "Medium - Mild Up"
+                elif avg_pitch > -3:
+                    gradient_impact = "Low - Flat"
+                else:
+                    gradient_impact = "Low - Downhill"
+                
+                ws.cell(row=row, column=1, value=hauler_id)
+                ws.cell(row=row, column=2, value="Route B")
+                ws.cell(row=row, column=3, value=route_b.get('distance_km', 0))
+                ws.cell(row=row, column=4, value=route_b.get('fuel_l', 0))
+                ws.cell(row=row, column=5, value=round(route_b.get('distance_km', 0) / 25, 2))
+                ws.cell(row=row, column=6, value=gradient_impact)
+                ws.cell(row=row, column=7, value=route_b.get('grade', 'Unknown'))
+                ws.cell(row=row, column=8, value=route_b.get('percentage_of_travel', 0))
+                ws.cell(row=row, column=9, value="")
+                
+                for col in range(1, 10):
+                    ws.cell(row=row, column=col).border = self.border
+                
+                row += 1
+        
+        column_widths = [12, 12, 14, 12, 10, 20, 14, 12, 35]
+        for col, width in enumerate(column_widths, 1):
+            ws.column_dimensions[get_column_letter(col)].width = width
+        
+        return ws
+    
+    def create_excavator_summary_sheet(self, excavator_results):
+        ws = self.wb.create_sheet("Excavator Summary")
+        
+        headers = ['Excavator Id', 'Cycle Time/Hauler', 'Tons/Hr', 'Fuel/Hr', 'Idle Time(Hr)', 
+                   'Running Time(Hr)', 'Number of Passes', 'Current Fuel Left(L)', 'Distance (Km)']
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.alignment = self.centered
+            cell.border = self.border
+        
+        row = 2
+        for device_id, data in excavator_results.items():
+            excavator_id = self.analyzer.map_device_id(device_id)
+            
+            ws.cell(row=row, column=1, value=excavator_id)
+            ws.cell(row=row, column=2, value=0)
+            ws.cell(row=row, column=3, value=0)
+            ws.cell(row=row, column=4, value=data.get('fuel_per_hour', 0))
+            ws.cell(row=row, column=5, value=data.get('idle_hours', 0))
+            ws.cell(row=row, column=6, value=data.get('running_hours', 0))
+            ws.cell(row=row, column=7, value=0)
+            ws.cell(row=row, column=8, value=0)
+            ws.cell(row=row, column=9, value=data.get('total_distance', 0))
+            
+            for col in range(1, 10):
+                ws.cell(row=row, column=col).border = self.border
+                if col > 1:
+                    ws.cell(row=row, column=col).alignment = self.right_aligned
+                else:
+                    ws.cell(row=row, column=col).alignment = self.centered
+            
+            row += 1
+        
+        column_widths = [15, 16, 12, 12, 14, 16, 16, 18, 12]
+        for col, width in enumerate(column_widths, 1):
+            ws.column_dimensions[get_column_letter(col)].width = width
+        
+        return ws
+    
+    def create_bulldozer_analysis_sheet(self, bulldozer_results):
+        ws = self.wb.create_sheet("Bulldozer Analysis")
+        
+        headers = ['Bulldozer Id', 'Distance (km)', 'Fuel (L)', 'Cost (₹)', 'Operating Hrs', 'Fuel per Hour (L)', 'Status']
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.alignment = self.centered
+            cell.border = self.border
+        
+        row = 2
+        for device_id, data in bulldozer_results.items():
+            ws.cell(row=row, column=1, value=self.analyzer.map_device_id(device_id))
+            ws.cell(row=row, column=2, value=data.get('total_distance', 0))
+            ws.cell(row=row, column=3, value=data.get('total_fuel', 0))
+            ws.cell(row=row, column=4, value=data.get('total_cost', 0))
+            ws.cell(row=row, column=5, value=data.get('operating_hours', 0))
+            ws.cell(row=row, column=6, value=data.get('fuel_per_hour', 0))
+            ws.cell(row=row, column=7, value=data.get('status', 'Unknown'))
+            
+            if data.get('status') == "Active Operation":
+                ws.cell(row=row, column=7).fill = self.good_fill
+            else:
+                ws.cell(row=row, column=7).fill = self.warning_fill
+            
+            for col in range(1, 8):
+                ws.cell(row=row, column=col).border = self.border
+                if col > 1:
+                    ws.cell(row=row, column=col).alignment = self.right_aligned
+            row += 1
+        
+        for col in range(1, 8):
+            ws.column_dimensions[get_column_letter(col)].width = 16
+        
+        return ws
+    
+    def create_executive_summary(self, hauler_results, excavator_results, bulldozer_results, report_type):
+        ws = self.wb.create_sheet("Executive Summary", 0)
+        
+        title_cell = ws.cell(row=1, column=1, value="MINING HAULER PERFORMANCE DASHBOARD")
+        title_cell.font = Font(size=16, bold=True, color='2C3E50')
+        title_cell.alignment = self.centered
+        ws.merge_cells('A1:H1')
+        
+        date_cell = ws.cell(row=2, column=1, value=f"Report Generated: {datetime.now().strftime('%d %B %Y %H:%M')}")
+        date_cell.font = Font(size=10, italic=True)
+        ws.merge_cells('A2:H2')
+        
+        report_type_cell = ws.cell(row=3, column=1, value=f"Report Type: {report_type.upper()} Analysis")
+        report_type_cell.font = Font(size=10, bold=True, color='2C3E50')
+        ws.merge_cells('A3:H3')
+        
+        total_fuel = sum(r.get('total_fuel', 0) for r in hauler_results.values())
+        total_cost = sum(r.get('total_cost', 0) for r in hauler_results.values())
+        total_distance = sum(r.get('total_distance', 0) for r in hauler_results.values())
+        total_trips = sum(r.get('trips', 0) for r in hauler_results.values())
+        total_hours = sum(r.get('total_hours', r.get('total_shift_hours', 0)) for r in hauler_results.values())
+        target_met_count = sum(1 for r in hauler_results.values() if r.get('target_met', False))
+        
+        metrics = [
+            ['Total Fuel Consumed', f"{total_fuel:,.1f} Liters", f"₹{total_cost:,.2f}"],
+            ['Total Distance Traveled', f"{total_distance:,.1f} km", ''],
+            ['Total Trips Completed', f"{total_trips}", ''],
+            ['Total Operating Hours', f"{total_hours:,.1f} hours", ''],
+            ['Number of Haulers', f"{len(hauler_results)}", ''],
+            ['Number of Excavators', f"{len(excavator_results)}", ''],
+            ['Number of Bulldozers', f"{len(bulldozer_results)}", ''],
+            ['', '', ''],
+            ['TARGET SUMMARY (1.5 trips per hour)', '', ''],
+            ['Haulers Meeting Target', f"{target_met_count} / {len(hauler_results)}", f"{target_met_count/len(hauler_results)*100:.0f}%" if hauler_results else '0%'],
+        ]
+        
+        row = 5
+        for metric in metrics:
+            ws.cell(row=row, column=1, value=metric[0]).font = Font(bold=True)
+            ws.cell(row=row, column=2, value=metric[1])
+            if len(metric) > 2:
+                ws.cell(row=row, column=3, value=metric[2])
+            row += 1
+        
+        for col in range(1, 4):
+            ws.column_dimensions[get_column_letter(col)].width = 30
+        
+        return ws
+    
+    def generate_report(self, hauler_results, excavator_results, bulldozer_results, report_type="shift"):
+        if 'Sheet' in self.wb.sheetnames:
+            std = self.wb['Sheet']
+            self.wb.remove(std)
+        
+        self.create_executive_summary(hauler_results, excavator_results, bulldozer_results, report_type)
+        self.create_hauler_summary_sheet(hauler_results)
+        self.create_gradient_analysis_sheet(hauler_results)
+        self.create_route_taken_analysis_sheet(hauler_results)
+        
+        if excavator_results:
+            self.create_excavator_summary_sheet(excavator_results)
+        
+        if bulldozer_results:
+            self.create_bulldozer_analysis_sheet(bulldozer_results)
+        
+        return self.wb
+
+
+def main():
+    try:
+        input_data = sys.stdin.read()
+        if not input_data:
+            print(json.dumps({'status': 'error', 'error': 'No input data'}))
+            return
+        
+        params = json.loads(input_data)
+        df = pd.DataFrame(params.get('data', []))
+        report_type = params.get('report_type', 'shift')
+        
+        if df.empty:
+            print(json.dumps({
+                'status': 'success',
+                'report': '',
+                'filename': 'No_Data.xlsx',
+                'devices_discovered': [],
+                'record_count': 0
+            }))
+            return
+        
+        print(f"Total records: {len(df)}", file=sys.stderr)
+        print(f"Report type: {report_type}", file=sys.stderr)
+        
+        essential_cols = ['lat', 'lon', 'pitch', 'speed']
+        for col in essential_cols:
+            if col not in df.columns:
+                df[col] = 0
+        
+        if 'device_id' not in df.columns:
+            df['device_id'] = 'UNKNOWN'
+        
+        if 'time' in df.columns:
+            df['time'] = pd.to_datetime(df['time'])
+            df = df.sort_values('time').reset_index(drop=True)
+        
+        df['lat'] = pd.to_numeric(df['lat'], errors='coerce').fillna(0)
+        df['lon'] = pd.to_numeric(df['lon'], errors='coerce').fillna(0)
+        df['pitch'] = pd.to_numeric(df['pitch'], errors='coerce').fillna(0)
+        df['speed'] = pd.to_numeric(df['speed'], errors='coerce').fillna(0)
+        
+        if 'rl' in df.columns:
+            df['rl'] = pd.to_numeric(df['rl'], errors='coerce').fillna(0)
+            print(f"RL column found - Range: {df['rl'].min()} to {df['rl'].max()}", file=sys.stderr)
+        
+        analyzer = SimpleMiningAnalytics()
+        
+        hauler_results = {}
+        excavator_results = {}
+        bulldozer_results = {}
+        
+        for device_id in df['device_id'].unique():
+            if pd.isna(device_id):
+                continue
+            
+            device_df = df[df['device_id'] == device_id].copy()
+            
+            if len(device_df) < 3:
+                continue
+            
+            if analyzer.is_hauler(device_id):
+                if report_type == 'shift':
+                    result = analyzer.analyze_shift_data(device_df)
+                elif report_type == 'daily':
+                    result = analyzer.analyze_daily_data(device_df)
+                else:
+                    result = analyzer.analyze_monthly_data(device_df)
+                
+                if result:
+                    hauler_results[str(device_id)] = result
+                    print(f"Hauler {device_id}: {result['trips']} trips, {result['trips_per_hour']} trips/hr, {result['total_distance']} km", file=sys.stderr)
+            
+            elif analyzer.is_excavator(device_id):
+                result = analyzer.analyze_excavator_data(device_df)
+                if result:
+                    excavator_results[str(device_id)] = result
+                    print(f"Excavator {device_id}: {result['total_distance']} km", file=sys.stderr)
+            
+            elif analyzer.is_bulldozer(device_id):
+                result = analyzer.analyze_bulldozer_data(device_df)
+                if result:
+                    bulldozer_results[str(device_id)] = result
+                    print(f"Bulldozer {device_id}: {result['total_distance']} km", file=sys.stderr)
+        
+        if not hauler_results and not excavator_results and not bulldozer_results:
+            print(json.dumps({
+                'status': 'success',
+                'report': '',
+                'filename': 'No_Valid_Data.xlsx',
+                'devices_discovered': [],
+                'record_count': len(df),
+                'warning': 'No devices with valid data'
+            }))
+            return
+        
+        print("Generating Excel report...", file=sys.stderr)
+        generator = ExcelReportGenerator()
+        wb = generator.generate_report(hauler_results, excavator_results, bulldozer_results, report_type)
+        
+        excel_bytes = BytesIO()
+        wb.save(excel_bytes)
+        excel_bytes.seek(0)
+        
+        date_str = datetime.now().strftime("%d%b%y").upper()
+        type_str = report_type.capitalize()
+        filename = f"Mining_Analytics_{type_str}_{date_str}.xlsx"
+        
+        output = {
+            'report': base64.b64encode(excel_bytes.read()).decode('utf-8'),
+            'filename': filename,
+            'status': 'success',
+            'devices_discovered': list(hauler_results.keys()) + list(excavator_results.keys()) + list(bulldozer_results.keys()),
+            'record_count': len(df),
+            'report_type': report_type,
+            'summary': {
+                'total_fuel': sum(r.get('total_fuel', 0) for r in hauler_results.values()),
+                'total_cost': sum(r.get('total_cost', 0) for r in hauler_results.values()),
+                'total_distance': sum(r.get('total_distance', 0) for r in hauler_results.values()),
+                'total_trips': sum(r.get('trips', 0) for r in hauler_results.values()),
+                'total_hours': sum(r.get('total_hours', r.get('total_shift_hours', 0)) for r in hauler_results.values()),
+                'target_met_count': sum(1 for r in hauler_results.values() if r.get('target_met', False))
+            }
+        }
+        
+        print(f"✅ Report generated! Haulers: {len(hauler_results)}", file=sys.stderr)
+        print(json.dumps(output))
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"ERROR: {str(e)}", file=sys.stderr)
+        print(json.dumps({'status': 'error', 'error': str(e)}))
+
+if __name__ == '__main__':
+    main()
+    '''
+
+    
+    
+    
+    
+'''
+# routes/analysis.py
+import sys
+import json
+import pandas as pd
+import base64
+from io import BytesIO
+from datetime import datetime
+import os
+
+# Add parent directory to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import from mining_analytics
+from mining_analytics.analysis.excavator_analyzer import ExcavatorAnalyzer
+from mining_analytics.analysis.hauler_analyzer import HaulerAnalyzer
+from mining_analytics.reports.report import ReportGenerator
+
+
+def main():
+    try:
+        input_data = sys.stdin.read()
+        if not input_data:
+            print(json.dumps({'status': 'error', 'error': 'No input data'}))
+            return
+        
+        params = json.loads(input_data)
+        data = params.get('data', [])
+        report_type = params.get('report_type', 'shift')
+        
+        print(f"📊 Processing {len(data)} records", file=sys.stderr)
+        
+        if not data:
+            print(json.dumps({
+                'status': 'success',
+                'report': '',
+                'filename': 'No_Data.xlsx',
+                'excavators': [],
+                'haulers': [],
+                'records': 0
+            }))
+            return
+        
+        df = pd.DataFrame(data)
+        print(f"📋 Columns: {df.columns.tolist()}", file=sys.stderr)
+        
+        # ========== ANALYZE EXCAVATORS ==========
+        analyzer = ExcavatorAnalyzer()
+        excavator_results = analyzer.analyze_multiple_devices(df)
+        print(f"✅ Found {len(excavator_results)} excavators", file=sys.stderr)
+        
+        # ========== ANALYZE HAULERS ==========
+        hauler_analyzer = HaulerAnalyzer()
+        hauler_results = hauler_analyzer.analyze_multiple_devices(df)
+        print(f"✅ Found {len(hauler_results)} haulers", file=sys.stderr)
+        
+        # ========== CHECK IF ANY DATA FOUND ==========
+        if not excavator_results and not hauler_results:
+            print(json.dumps({
+                'status': 'success',
+                'report': '',
+                'filename': 'No_Data.xlsx',
+                'excavators': [],
+                'haulers': [],
+                'records': len(df),
+                'warning': 'No devices found'
+            }))
+            return
+        
+        # ========== GENERATE EXCEL ==========
+        generator = ReportGenerator()
+        wb = generator.generate(
+            excavator_results=excavator_results,
+            hauler_results=hauler_results
+        )
+        
+        excel_bytes = BytesIO()
+        wb.save(excel_bytes)
+        excel_bytes.seek(0)
+        
+        date_str = datetime.now().strftime("%d%b%y").upper()
+        filename = f"Mining_Report_{date_str}.xlsx"  # ← CHANGED
+        
+        output = {
+            'status': 'success',
+            'report': base64.b64encode(excel_bytes.read()).decode('utf-8'),
+            'filename': filename,
+            'excavators': list(excavator_results.keys()),
+            'haulers': list(hauler_results.keys()),  # ← ADDED
+            'records': len(df),
+            'excavator_count': len(excavator_results),
+            'hauler_count': len(hauler_results),  # ← ADDED
+            'report_type': report_type
+        }
+        
+        print(json.dumps(output))
+        
+    except Exception as e:
+        import traceback
+        error_msg = str(e)
+        error_trace = traceback.format_exc()
+        print(f"❌ ERROR: {error_msg}", file=sys.stderr)
+        print(error_trace, file=sys.stderr)
+        print(json.dumps({'status': 'error', 'error': error_msg}))
+
+
+if __name__ == '__main__':
+    main()    
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+'''
+    # routes/analysis.py - COMPLETE FINAL CODE WITH PROPER SHIFT/DAILY/MONTHLY
 
 import pandas as pd
 import numpy as np
@@ -72,12 +1878,12 @@ class SimpleMiningAnalytics:
         self.min_trip_distance_km = 0.5
         
         # Equipment classification
-        self.hauler_ids = ['D3', 'D8', 'D9', 'D12', '135', '133', '137', '134']
+        self.hauler_ids = ['D3', 'D10', 'D11', 'D12', '137', '133', '134', '135']
         self.excavator_ids = ['D7', '07', '7', '43']
-        self.bulldozer_ids = ['D10', '08']
+        self.bulldozer_ids = ['D8', '08']
         
         self.device_mapping = {
-            'D3': '135', 'D8': '133', 'D9': '137', 'D7': '43', 'D10': '08', 'D12': '134'
+            'D3': '137', 'D7': '43', 'D10': '133', 'D11': '134', 'D12': '135'
         }
     
     def map_device_id(self, device_id):
@@ -1234,8 +3040,7 @@ class ExcelReportGenerator:
     def create_excavator_analysis(self, results):
         ws = self.wb.create_sheet("Excavator Analysis")
         
-        headers = ['Equipment ID', 'Type', 'Distance (km)', 'Fuel (L)', 'Cost (₹)', 
-                   'Fuel/km (L/km)', 'Idle %', 'Maintenance %', 'Operating Status']
+        headers = ['Equipment ID', 'Type', 'Distance (km)', 'Runtime %', 'Maintenance %', 'Operating Status']
         
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
@@ -1249,12 +3054,9 @@ class ExcelReportGenerator:
             ws.cell(row=row, column=1, value=self.analyzer.map_device_id(device_id))
             ws.cell(row=row, column=2, value="Excavator")
             ws.cell(row=row, column=3, value=data['total_distance'])
-            ws.cell(row=row, column=4, value=data['total_fuel'])
-            ws.cell(row=row, column=5, value=data['total_cost'])
-            ws.cell(row=row, column=6, value=data['fuel_per_km'])
-            ws.cell(row=row, column=7, value=data['idle_ratio'])
-            ws.cell(row=row, column=8, value=data.get('maintenance_time_pct', 0))
-            ws.cell(row=row, column=9, value=data['operating_status'])
+            ws.cell(row=row, column=4, value=data['idle_ratio'])
+            ws.cell(row=row, column=5, value=data.get('maintenance_time_pct', 0))
+            ws.cell(row=row, column=6, value=data['operating_status'])
             
             for col in range(1, 10):
                 ws.cell(row=row, column=col).border = self.border
