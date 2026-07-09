@@ -851,9 +851,153 @@ const getDeviceShiftData = (req, res) => {
   });
 };
 
+
+const getAllDevicesShiftData = (req, res) => {
+  console.log('========================================');
+  console.log('getAllDevicesShiftData called at:', new Date().toISOString());
+  console.log('Full req.query:', JSON.stringify(req.query, null, 2));
+  console.log('========================================');
+
+  const { shift, region_id } = req.query;
+
+  if (!shift || !region_id) {
+    return res.status(400).json({
+      error: "shift and region_id required"
+    });
+  }
+
+  const now = new Date();
+  const currentHour = now.getHours();
+
+  const todayObj = new Date();
+  const yesterdayObj = new Date();
+  const tomorrowObj = new Date();
+
+  yesterdayObj.setDate(yesterdayObj.getDate() - 1);
+  tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+
+  const today = todayObj.toISOString().split('T')[0];
+  const yesterday = yesterdayObj.toISOString().split('T')[0];
+  const tomorrow = tomorrowObj.toISOString().split('T')[0];
+
+  let query;
+  let params;
+
+  // ---------------- MORNING ----------------
+  if (shift === 'morning') {
+
+    // before 6AM morning shift hasn't started yet
+    const targetDate = currentHour < 6 ? yesterday : today;
+
+    query = `
+      SELECT *
+      FROM realtime_sensor_data
+      WHERE region_id = ?
+      AND DATE(timestamp) = ?
+      AND TIME(timestamp) >= '06:00:00'
+      AND TIME(timestamp) < '14:00:00'
+      ORDER BY device_id, timestamp ASC
+    `;
+
+    params = [region_id, targetDate];
+  }
+
+  // ---------------- AFTERNOON ----------------
+  else if (shift === 'afternoon') {
+
+    // before 2PM afternoon shift hasn't started yet
+    const targetDate = currentHour < 14 ? yesterday : today;
+
+    query = `
+      SELECT *
+      FROM realtime_sensor_data
+      WHERE region_id = ?
+      AND DATE(timestamp) = ?
+      AND TIME(timestamp) >= '14:00:00'
+      AND TIME(timestamp) < '22:00:00'
+      ORDER BY device_id, timestamp ASC
+    `;
+
+    params = [region_id, targetDate];
+  }
+
+  // ---------------- NIGHT ----------------
+  else if (shift === 'night') {
+
+    let startDate;
+    let endDate;
+
+    // Night shift is active between 22:00 and 06:00
+    if (currentHour >= 22) {
+      // Current night shift
+      startDate = today;
+      endDate = tomorrow;
+    } else {
+      // Before 10PM -> show previous completed night shift
+      startDate = yesterday;
+      endDate = today;
+    }
+
+    query = `
+      SELECT *
+      FROM realtime_sensor_data
+      WHERE region_id = ?
+      AND (
+        (DATE(timestamp) = ? AND TIME(timestamp) >= '22:00:00')
+        OR
+        (DATE(timestamp) = ? AND TIME(timestamp) < '06:00:00')
+      )
+      ORDER BY device_id, timestamp ASC
+    `;
+
+    params = [region_id, startDate, endDate];
+  }
+
+  else {
+    return res.status(400).json({
+      error: "Invalid shift"
+    });
+  }
+
+  console.log('SQL Query:', query);
+  console.log('Params:', params);
+
+  db.query(query, params, (err, results) => {
+    if (err) {
+      console.error("Database Error:", err);
+      return res.status(500).json({
+        error: "Database error"
+      });
+    }
+
+    console.log(`Found ${results.length} records`);
+
+    const filteredResults = results.map(row => {
+      const filteredRow = {};
+
+      Object.keys(row).forEach(key => {
+        if (row[key] !== null && row[key] !== undefined) {
+          filteredRow[key] = row[key];
+        }
+      });
+
+      return filteredRow;
+    });
+
+    res.json({
+      status: "success",
+      region_id,
+      shift,
+      total_records: filteredResults.length,
+      data: filteredResults
+    });
+  });
+};
+
+
 // Get shift data for ALL devices in a region
 //complet code wotking final maincode 
-const getAllDevicesShiftData = (req, res) => {
+/*const getAllDevicesShiftData = (req, res) => {
   // DEBUG: Log everything
   console.log('========================================');
   console.log('getAllDevicesShiftData called at:', new Date().toISOString());
@@ -946,7 +1090,7 @@ const getAllDevicesShiftData = (req, res) => {
       data: filteredResults
     });
   });
-};
+};*/
 
 //this is for coustom date only siftwise 
 /*const getAllDevicesShiftData = (req, res) => {
@@ -959,39 +1103,16 @@ const getAllDevicesShiftData = (req, res) => {
   console.log('date value:', req.query.date);
   console.log('========================================');
 
-  const { shift, region_id, date } = req.query;
+  const { shift, region_id } = req.query;
 
   if (!shift || !region_id) {
     console.log('❌ Missing parameters!');
     return res.status(400).json({ error: "shift and region_id required" });
   }
 
-  // Determine the target date
-  let targetDate;
-  let dateStr;
-  let nextDayStr;
-
-  if (date) {
-    // Use provided date
-    targetDate = new Date(date);
-    if (isNaN(targetDate.getTime())) {
-      return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
-    }
-    dateStr = targetDate.toISOString().split('T')[0];
-    console.log(`📅 Using provided date: ${dateStr}`);
-  } else {
-    // Use yesterday (June 29, 2026) or today if not specified
-    // For June 30, 2026, yesterday is June 29, 2026
-    targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() - 1); // Yesterday
-    dateStr = targetDate.toISOString().split('T')[0];
-    console.log(`📅 Using yesterday's date: ${dateStr}`);
-  }
-
-  // Calculate next day for night shift
-  const nextDay = new Date(targetDate);
-  nextDay.setDate(nextDay.getDate() + 1);
-  nextDayStr = nextDay.toISOString().split('T')[0];
+  // HARDCODED TO JUNE 30, 2026
+  const dateStr = '2026-07-08';
+  const nextDayStr = '2026-07-09';
 
   console.log('📅 Target date:', dateStr);
   console.log('📅 Next day:', nextDayStr);
@@ -1650,8 +1771,7 @@ const generateAnalysisReport = (req, res) => {
     device_id,
     timeRange,
     shift,
-    region_id,
-    date  // Keep this parameter
+    region_id
   } = req.query;
 
   if (!device_id || !timeRange) {
@@ -1660,15 +1780,8 @@ const generateAnalysisReport = (req, res) => {
     });
   }
 
-  // If no date provided, use yesterday (June 29, 2026)
-  let targetDate;
-  if (date) {
-    targetDate = date;
-  } else {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    targetDate = yesterday.toISOString().split('T')[0];
-  }
+  // HARDCODED TO JUNE 30, 2026
+  const targetDate = '2026-06-30';
   
   console.log(`📊 Generating analysis for ${device_id} - ${timeRange} (Date: ${targetDate}) ${shift || ''} (Region: ${region_id || 'ALL'})`);
 
@@ -1693,31 +1806,20 @@ const generateAnalysisReport = (req, res) => {
 
       console.log('  Mapped shiftParam:', shiftParam);
 
-      const newReq = {
-        ...req,
-        query: {
-          ...req.query,
-          shift: shiftParam,
-          region_id: region_id,
-          date: targetDate  // Pass the date
-        }
-      };
+      // Directly modify req.query - HARDCODED DATE
+      req.query.shift = shiftParam;
+      req.query.region_id = region_id;
 
-      console.log('  newReq.query:', newReq.query);
+      console.log('  Modified req.query:', req.query);
 
-      dataFetcher = (req2, res2) => {
-        console.log('📞 Calling getAllDevicesShiftData with:', req2.query);
-        getAllDevicesShiftData(req2, res2);
-      };
+      dataFetcher = getAllDevicesShiftData;
     }
     else if (timeRange === 'daily') {
       if (region_id) req.query.region_id = region_id;
-      req.query.date = targetDate;
       dataFetcher = getAllDevicesDailyData;
     }
     else if (timeRange === 'monthly') {
       if (region_id) req.query.region_id = region_id;
-      req.query.date = targetDate;
       dataFetcher = getAllDevicesMonthlyData;
     }
     else {
@@ -1733,17 +1835,14 @@ const generateAnalysisReport = (req, res) => {
 
       req.query.shift = shiftParam;
       if (region_id) req.query.region_id = region_id;
-      req.query.date = targetDate;
       dataFetcher = getDeviceShiftData;
     }
     else if (timeRange === 'daily') {
       if (region_id) req.query.region_id = region_id;
-      req.query.date = targetDate;
       dataFetcher = getDeviceDailyData;
     }
     else if (timeRange === 'monthly') {
       if (region_id) req.query.region_id = region_id;
-      req.query.date = targetDate;
       dataFetcher = getDeviceMonthlyData;
     }
     else {
@@ -1848,6 +1947,7 @@ const generateAnalysisReport = (req, res) => {
   // Call the appropriate data fetcher
   dataFetcher(req, res);
 };*/
+
 // ==================== EXPORT ALL FUNCTIONS ====================
 module.exports = {
   register,
