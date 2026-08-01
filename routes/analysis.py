@@ -1681,124 +1681,7 @@ if __name__ == '__main__':
     main()
     '''
 
-    
-    
-    
-    
-'''
-# routes/analysis.py
-import sys
-import json
-import pandas as pd
-import base64
-from io import BytesIO
-from datetime import datetime
-import os
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# Import from mining_analytics
-from mining_analytics.analysis.excavator_analyzer import ExcavatorAnalyzer
-from mining_analytics.analysis.hauler_analyzer import HaulerAnalyzer
-from mining_analytics.reports.report import ReportGenerator
-
-
-def main():
-    try:
-        input_data = sys.stdin.read()
-        if not input_data:
-            print(json.dumps({'status': 'error', 'error': 'No input data'}))
-            return
-        
-        params = json.loads(input_data)
-        data = params.get('data', [])
-        report_type = params.get('report_type', 'shift')
-        
-        print(f"📊 Processing {len(data)} records", file=sys.stderr)
-        
-        if not data:
-            print(json.dumps({
-                'status': 'success',
-                'report': '',
-                'filename': 'No_Data.xlsx',
-                'excavators': [],
-                'haulers': [],
-                'records': 0
-            }))
-            return
-        
-        df = pd.DataFrame(data)
-        print(f"📋 Columns: {df.columns.tolist()}", file=sys.stderr)
-        
-        # ========== ANALYZE EXCAVATORS ==========
-        analyzer = ExcavatorAnalyzer()
-        excavator_results = analyzer.analyze_multiple_devices(df)
-        print(f"✅ Found {len(excavator_results)} excavators", file=sys.stderr)
-        
-        # ========== ANALYZE HAULERS ==========
-        hauler_analyzer = HaulerAnalyzer()
-        hauler_results = hauler_analyzer.analyze_multiple_devices(df)
-        print(f"✅ Found {len(hauler_results)} haulers", file=sys.stderr)
-        
-        # ========== CHECK IF ANY DATA FOUND ==========
-        if not excavator_results and not hauler_results:
-            print(json.dumps({
-                'status': 'success',
-                'report': '',
-                'filename': 'No_Data.xlsx',
-                'excavators': [],
-                'haulers': [],
-                'records': len(df),
-                'warning': 'No devices found'
-            }))
-            return
-        
-        # ========== GENERATE EXCEL ==========
-        generator = ReportGenerator()
-        wb = generator.generate(
-            excavator_results=excavator_results,
-            hauler_results=hauler_results
-        )
-        
-        excel_bytes = BytesIO()
-        wb.save(excel_bytes)
-        excel_bytes.seek(0)
-        
-        date_str = datetime.now().strftime("%d%b%y").upper()
-        filename = f"Mining_Report_{date_str}.xlsx"  # ← CHANGED
-        
-        output = {
-            'status': 'success',
-            'report': base64.b64encode(excel_bytes.read()).decode('utf-8'),
-            'filename': filename,
-            'excavators': list(excavator_results.keys()),
-            'haulers': list(hauler_results.keys()),  # ← ADDED
-            'records': len(df),
-            'excavator_count': len(excavator_results),
-            'hauler_count': len(hauler_results),  # ← ADDED
-            'report_type': report_type
-        }
-        
-        print(json.dumps(output))
-        
-    except Exception as e:
-        import traceback
-        error_msg = str(e)
-        error_trace = traceback.format_exc()
-        print(f"❌ ERROR: {error_msg}", file=sys.stderr)
-        print(error_trace, file=sys.stderr)
-        print(json.dumps({'status': 'error', 'error': error_msg}))
-
-
-if __name__ == '__main__':
-    main()    
-
-    
-    
-    
-    
-    
     
     
     
@@ -3629,4 +3512,1248 @@ def main():
         print(json.dumps({'status': 'error', 'error': str(e), 'traceback': error_trace}))
 
 if __name__ == '__main__':
+    main()
+    '''
+    
+    
+    
+    
+    
+ 
+ 
+ 
+      
+import sys
+import json
+import base64
+from io import BytesIO
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from math import radians, sin, cos, sqrt, asin, atan2, degrees
+from datetime import datetime
+
+# ============================================
+# CONFIGURATION
+# ============================================
+
+# ============================================
+# GPS VALIDATION SETTINGS
+# ============================================
+MIN_VALID_LAT = 0
+MAX_VALID_LAT = 90
+MIN_VALID_LON = 60
+MAX_VALID_LON = 90
+MAX_GPS_JUMP_METERS = 1000  # 1km
+
+# ============================================
+# EXCAVATOR POLYGON (Hardcoded locations)
+# ============================================
+EXCAVATOR_POLYGON = {
+    "name": "Excavator Area",
+    "buffer": 50,
+    "coordinates": [
+        [20.410580, 81.064820],
+        [20.410420, 81.064980],
+        [20.410120, 81.065120],
+        [20.409760, 81.065210],
+        [20.409350, 81.065280],
+        [20.409015, 81.065498],
+        [20.408450, 81.065300],
+        [20.408300, 81.065170],
+        [20.408420, 81.064980],
+        [20.408760, 81.064860],
+        [20.409250, 81.064760],
+        [20.409900, 81.064720],
+        [20.408582, 81.064937],
+        [20.408582, 81.064937],
+        [20.407972, 81.064953],
+        [20.407354, 81.064937],
+        [20.406648, 81.065143],
+        [20.406927, 81.065759],
+        [20.407461, 81.065844],
+        [20.407982, 81.065810],
+        [20.408610, 81.065535]
+    ]
+}
+
+# ============================================
+# CIRCLE-BASED DUMP LOCATIONS
+# ============================================
+DUMP_LOCATIONS = [
+    {"id": 2, "lat": 20.4100060, "lon": 81.0692020, "name": "Dump Point 2", "type": "circle", "radius": 100},
+    {"id": 3, "lat": 20.4120070, "lon": 81.0610040, "name": "Dump Point 3", "type": "circle", "radius": 100},
+    {"id": 4, "lat": 20.4023750, "lon": 81.0627800, "name": "Dump Point 4", "type": "circle", "radius": 150},
+    {"id": 5, "lat": 20.4015760, "lon": 81.0623530, "name": "Dump Point 5", "type": "circle", "radius": 200},
+    {"id": 6, "lat": 20.4023410, "lon": 81.0627860, "name": "Dump Point 6", "type": "circle", "radius": 100},
+    {"id": 1, "lat": 20.4048420, "lon": 81.0642720, "name": "Dump Point 1", "type": "circle", "radius": 100},
+    {"id": 7, "lat": 20.410206, "lon":  81.067661, "name": "Dump Point 7", "type": "circle", "radius": 100}
+]
+
+# ============================================
+# POLYGON-BASED DUMP LOCATION
+# ============================================
+POLYGON_DUMP = {
+    "id": 8,
+    "name": "Dump Point 8 (Polygon)",
+    "type": "polygon",
+    "buffer": 10,
+    "coordinates": [
+        [20.410397, 81.069136],
+        [20.409659, 81.068908],
+        [20.408986, 81.068988],
+        [20.408270, 81.069204],
+        [20.407851, 81.069499],
+        [20.407742, 81.069823],
+        [20.407962, 81.070121],
+        [20.408435, 81.070284],
+        [20.409158, 81.070216],
+        [20.409862, 81.069735]
+    ]
+}
+
+ALL_DUMP_LOCATIONS = DUMP_LOCATIONS + [POLYGON_DUMP]
+
+DEVICE_TO_HAULER = {
+    'd3': '137',
+    'd7': '43',
+    'd10': '133',
+    'd11': '134',
+    'd12': '135',
+}
+
+HAULER_DEVICES = ['d3', 'd10', 'd11', 'd12']
+EXCAVATOR_DEVICE = 'd7'
+HAULER_SHEETS = ['133', '134', '135', '137']
+DUMP_RADIUS_METERS = 100
+EXCAVATOR_BUFFER_METERS = 50
+
+MAINTENANCE_LAT = 20.404977
+MAINTENANCE_LON = 81.066210
+MAINTENANCE_RADIUS = 52
+
+# ============================================
+# GPS VALIDATION FUNCTIONS
+# ============================================
+
+def is_valid_gps(lat, lon):
+    if lat == 0 or lon == 0:
+        return False
+    if lat < MIN_VALID_LAT or lat > MAX_VALID_LAT:
+        return False
+    if lon < MIN_VALID_LON or lon > MAX_VALID_LON:
+        return False
+    return True
+
+# ============================================
+# POLYGON HELPER FUNCTIONS - ONLY USED FOR DETECTION
+# ============================================
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """ONLY used for polygon/buffer detection, NOT for trip distances"""
+    R = 6371000
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a))
+    return R * c
+
+def point_in_polygon(lat, lon, polygon_coords):
+    x = lon
+    y = lat
+    inside = False
+    n = len(polygon_coords)
+    
+    for i in range(n):
+        x1 = polygon_coords[i][1]
+        y1 = polygon_coords[i][0]
+        x2 = polygon_coords[(i + 1) % n][1]
+        y2 = polygon_coords[(i + 1) % n][0]
+        
+        if (y1 == y2 and y == y1 and min(x1, x2) <= x <= max(x1, x2)):
+            return True
+        
+        if ((y1 > y) != (y2 > y)):
+            x_intersect = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
+            if x <= x_intersect:
+                inside = not inside
+    
+    return inside
+
+def point_on_segment_with_distance(lat, lon, p1, p2, buffer_m):
+    lat1, lon1 = p1
+    lat2, lon2 = p2
+    
+    dx = lat2 - lat1
+    dy = lon2 - lon1
+    
+    if dx == 0 and dy == 0:
+        dist = haversine_distance(lat, lon, lat1, lon1)
+        return dist <= buffer_m, dist
+    
+    t = ((lat - lat1) * dx + (lon - lon1) * dy) / (dx * dx + dy * dy)
+    t = max(0, min(1, t))
+    
+    closest_lat = lat1 + t * dx
+    closest_lon = lon1 + t * dy
+    
+    dist = haversine_distance(lat, lon, closest_lat, closest_lon)
+    return dist <= buffer_m, dist
+
+def point_in_polygon_with_buffer(lat, lon, polygon_coords, buffer_m):
+    if point_in_polygon(lat, lon, polygon_coords):
+        return True, "inside_polygon", 0
+    
+    n = len(polygon_coords)
+    min_dist = float('inf')
+    for i in range(n):
+        p1 = polygon_coords[i]
+        p2 = polygon_coords[(i + 1) % n]
+        is_within, dist = point_on_segment_with_distance(lat, lon, p1, p2, buffer_m)
+        if dist < min_dist:
+            min_dist = dist
+        if is_within:
+            return True, f"within_buffer_{dist:.1f}m", dist
+    
+    return False, f"outside_{min_dist:.1f}m", min_dist
+
+def is_in_polygon_dump(lat, lon):
+    if not is_valid_gps(lat, lon):
+        return False
+    return point_in_polygon_with_buffer(
+        lat, lon, 
+        POLYGON_DUMP["coordinates"], 
+        POLYGON_DUMP["buffer"]
+    )[0]
+
+def is_in_excavator_area(lat, lon):
+    if not is_valid_gps(lat, lon):
+        return False, "invalid", 0
+    return point_in_polygon_with_buffer(
+        lat, lon,
+        EXCAVATOR_POLYGON["coordinates"],
+        EXCAVATOR_BUFFER_METERS
+    )
+
+# ============================================
+# HELPER FUNCTIONS
+# ============================================
+
+def get_hauler_number(device_id):
+    if not device_id:
+        return device_id
+    return DEVICE_TO_HAULER.get(device_id.lower(), device_id)
+
+def is_hauler(device_id):
+    if not device_id:
+        return False
+    return device_id.lower() in HAULER_DEVICES
+
+def is_excavator(device_id):
+    if not device_id:
+        return False
+    return device_id.lower() == EXCAVATOR_DEVICE
+
+def is_in_maintenance_area(lat, lon):
+    if not is_valid_gps(lat, lon):
+        return False
+    return haversine_distance(lat, lon, MAINTENANCE_LAT, MAINTENANCE_LON) <= MAINTENANCE_RADIUS
+
+def is_at_dump(lat, lon):
+    if not is_valid_gps(lat, lon):
+        return False, None, 0
+    
+    for dump in DUMP_LOCATIONS:
+        dist = haversine_distance(lat, lon, dump['lat'], dump['lon'])
+        if dist <= dump['radius']:
+            return True, dump, dist
+    
+    if is_in_polygon_dump(lat, lon):
+        return True, POLYGON_DUMP, 0
+    
+    return False, None, 0
+
+def get_location_type(lat, lon):
+    if not is_valid_gps(lat, lon):
+        return 'unknown', f'Invalid GPS ({lat:.4f}, {lon:.4f})'
+    
+    if is_in_maintenance_area(lat, lon):
+        return 'maintenance', 'Maintenance Area'
+    
+    at_dump, dump, dist = is_at_dump(lat, lon)
+    if at_dump:
+        return 'dump', dump['name']
+    
+    in_exc, status, dist = is_in_excavator_area(lat, lon)
+    if in_exc:
+        return 'excavator', f'Excavator Area ({status})'
+    
+    return 'unknown', f'Location ({lat:.4f}, {lon:.4f})'
+
+def calculate_duration(start_time, end_time):
+    try:
+        for fmt in ['%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S.%f']:
+            try:
+                start = datetime.strptime(str(start_time), fmt)
+                end = datetime.strptime(str(end_time), fmt)
+                diff_seconds = (end - start).total_seconds()
+                if diff_seconds >= 0:
+                    return round(diff_seconds / 60, 1)
+            except:
+                continue
+        return 0
+    except:
+        return 0
+
+def analyze_trips(records):
+    trips_data = {}
+    all_point_data = []
+    
+    
+    for record in records:
+        device_id = record.get('device_id')
+        if not device_id:
+            continue
+        if is_excavator(device_id):
+            continue
+        if not is_hauler(device_id):
+            continue
+        
+        lat = record.get('lat', 0)
+        lon = record.get('lon', 0)
+        timestamp = record.get('time', '')
+        
+        # Get distance from the distance column (values are in KM)
+        distance = record.get('distance', 0)
+        try:
+            distance = float(distance) if distance else 0
+        except:
+            distance = 0
+        
+        # Add this with other telemetry data
+        fuel_consumption = record.get('fuel_consumption', 0)
+        # Then parse it
+        try:
+            fuel_consumption = float(fuel_consumption) if fuel_consumption else 0
+        except:
+            fuel_consumption = 0
+            
+        pitch = record.get('pitch', 0)
+        roll = record.get('roll', 0)
+        vibration = record.get('vibration', 0)
+        fuel = record.get('fuel', 0)
+        speed = record.get('speed', 0)
+        
+        try:
+            lat = float(lat)
+            lon = float(lon)
+            pitch = float(pitch) if pitch else 0
+            roll = float(roll) if roll else 0
+            vibration = float(vibration) if vibration else 0
+            fuel = float(fuel) if fuel else 0
+            speed = float(speed) if speed else 0
+        except Exception as e:
+            print(f"⚠️ Error parsing record: {e}", file=sys.stderr)
+            continue
+        
+        if not is_valid_gps(lat, lon):
+            continue
+        
+        loc_type, loc_name = get_location_type(lat, lon)
+        
+        # Check if this is inside polygon or buffer
+        is_inside_polygon = 'inside_polygon' in loc_name.lower()
+        is_within_buffer = 'within_buffer' in loc_name.lower()
+        
+        point_info = {
+            'hauler': get_hauler_number(device_id),
+            'timestamp': timestamp,
+            'lat': lat,
+            'lon': lon,
+            'location_type': loc_type,
+            'location_name': loc_name,
+            'distance': distance,  # Already in KM
+            'fuel_consumption': fuel_consumption,
+            'pitch': pitch,
+            'roll': roll,
+            'vibration': vibration,
+            'fuel': fuel,
+            'speed': speed,
+            'is_inside_polygon': is_inside_polygon,
+            'is_within_buffer': is_within_buffer
+        }
+        all_point_data.append(point_info)
+        
+        if device_id not in trips_data:
+            trips_data[device_id] = {
+                'hauler': get_hauler_number(device_id),
+                'first_record': None,
+                'last_record': None,
+                'trips': [],
+                'current_trip': None,
+                'trip_points': [],
+                'all_gps_points': [],
+                'maintenance_points': [],
+                'at_excavator': False,
+                'at_dump': False,
+                'excavator_start_time': None,
+                'dump_start_time': None,
+                'trip_start_time': None,
+                'current_location': None,
+                'location_start_time': None,
+                'location_start_lat': None,
+                'location_start_lon': None,
+                'total_maintenance_minutes': 0,
+                'total_unknown_minutes': 0,
+                'total_dump_minutes': 0,
+                'total_excavator_minutes': 0,
+                'total_loaded_distance_km': 0,
+                'total_trip_distance_km': 0,
+                'total_maintenance_distance_km': 0,
+                'last_gps_point': None,
+                'trip_ended_in_maintenance': False,
+                'trip_ended_in_unknown': False,
+                'trip_visited_maintenance': False,
+                'in_trip': False,
+                'last_trip_point': None,
+                'excavator_start_lat': None,
+                'excavator_start_lon': None,
+                'trip_unknown_points': [],
+                'trip_distance': 0,  # Accumulated distance in KM
+                'trip_loaded_distance': 0,
+                'trip_start_distance': 0,
+                'trip_first_excavator_distance': 0,
+                'trip_first_dump_distance': 0,
+                'trip_last_dump_distance': 0,
+                'trip_end_distance': 0,
+                'trip_started_with_buffer': False,
+                'trip_dump_location': None,
+                'first_dump_found': False,
+                'trip_accumulated_distance': 0,  # Accumulate hop distances in KM
+                'trip_start_fuel': 0,
+                'last_fuel_level': 0
+            }
+        
+        hauler = trips_data[device_id]
+        
+        if hauler['first_record'] is None:
+            hauler['first_record'] = timestamp
+        hauler['last_record'] = timestamp
+        
+        # Store distance
+        hauler['all_gps_points'].append({
+            'lat': lat,
+            'lon': lon,
+            'time': timestamp,
+            'type': loc_type,
+            'name': loc_name,
+            'distance': distance,
+            'is_inside_polygon': is_inside_polygon,
+            'is_within_buffer': is_within_buffer
+        })
+        
+        # Location history for time tracking only
+        if hauler['current_location'] != loc_name:
+            if hauler['current_location'] is not None and hauler['location_start_time'] is not None:
+                duration = calculate_duration(hauler['location_start_time'], timestamp)
+                if duration > 0:
+                    if 'Maintenance' in hauler['current_location']:
+                        hauler['total_maintenance_minutes'] += duration
+                    elif 'Location' in hauler['current_location'] and 'Excavator' not in hauler['current_location'] and 'Dump' not in hauler['current_location']:
+                        hauler['total_unknown_minutes'] += duration
+                    elif 'Dump' in hauler['current_location']:
+                        hauler['total_dump_minutes'] += duration
+                    elif 'Excavator' in hauler['current_location']:
+                        hauler['total_excavator_minutes'] += duration
+            
+            hauler['current_location'] = loc_name
+            hauler['location_start_time'] = timestamp
+            hauler['location_start_lat'] = lat
+            hauler['location_start_lon'] = lon
+        
+        # ============================================
+        # TRIP LOGIC - ACCUMULATE HOP DISTANCES (in KM)
+        # ============================================
+        
+        if loc_type == 'maintenance' and hauler['current_trip'] is not None:
+            hauler['trip_visited_maintenance'] = True
+            hauler['maintenance_points'].append((lat, lon, timestamp, distance))
+        
+        if loc_type == 'maintenance' and hauler['at_dump'] and hauler['current_trip'] is not None:
+            hauler['trip_ended_in_maintenance'] = True
+        
+        # START TRIP - Store first excavator point
+        if loc_type == 'excavator' and not hauler['at_excavator'] and hauler['current_trip'] is None:
+            if is_inside_polygon or is_within_buffer:
+                hauler['at_excavator'] = True
+                hauler['in_trip'] = True
+                hauler['trip_start_time'] = timestamp
+                hauler['excavator_start_time'] = timestamp
+                hauler['trip_points'] = []
+                hauler['maintenance_points'] = []
+                hauler['trip_accumulated_distance'] = 0  # Reset accumulated distance in KM
+                hauler['trip_ended_in_maintenance'] = False
+                hauler['trip_ended_in_unknown'] = False
+                hauler['trip_visited_maintenance'] = False
+                hauler['last_trip_point'] = None
+                hauler['trip_unknown_points'] = []
+                hauler['first_dump_found'] = False
+                hauler['trip_start_fuel'] = fuel
+                # Store first excavator point distance
+                hauler['trip_first_excavator_distance'] = 0
+                hauler['trip_start_distance'] = 0
+                hauler['trip_started_with_buffer'] = not is_inside_polygon
+                
+                hauler['current_trip'] = {
+                    'excavator_arrival': timestamp,
+                    'excavator_lat': lat,
+                    'excavator_lon': lon,
+                    'started_with_buffer': not is_inside_polygon,
+                    'used_inside_polygon': is_inside_polygon
+                }
+                hauler['trip_points'].append((lat, lon, timestamp, distance, is_inside_polygon, is_within_buffer))
+                hauler['last_trip_point'] = (lat, lon, timestamp, distance, is_inside_polygon, is_within_buffer)
+                
+                if is_inside_polygon:
+                    print(f"🚚 {device_id}: TRIP START - Inside Excavator Polygon at {timestamp}", file=sys.stderr)
+                else:
+                    print(f"🚚 {device_id}: TRIP START - Excavator Buffer (50m) at {timestamp}", file=sys.stderr)
+        
+        # TRACK ALL POINTS DURING TRIP - ACCUMULATE HOP DISTANCES (in KM)
+        elif hauler['current_trip'] is not None:
+            hauler['trip_points'].append((lat, lon, timestamp, distance, is_inside_polygon, is_within_buffer))
+            
+            if loc_type == 'unknown':
+                hauler['trip_unknown_points'].append((lat, lon, timestamp, distance))
+                
+            if fuel > 0:
+                hauler['last_fuel_level'] = fuel    
+            
+            # ACCUMULATE hop distance (distance is in KM)
+            if distance > 0 and distance <= 1:  # Max 1km jump
+                hauler['trip_accumulated_distance'] += distance
+            elif distance > 1:
+                print(f"⚠️ Outlier distance ignored: {distance:.2f}km at {timestamp}", file=sys.stderr)
+            
+            hauler['last_trip_point'] = (lat, lon, timestamp, distance, is_inside_polygon, is_within_buffer)
+        
+        # AT DUMP - Store first dump point distance
+        if loc_type == 'dump' and hauler['current_trip'] is not None and not hauler['at_dump']:
+            hauler['at_dump'] = True
+            hauler['dump_start_time'] = timestamp
+            
+            # Store first dump point distance (accumulated so far)
+            if not hauler['first_dump_found']:
+                hauler['trip_first_dump_distance'] = hauler['trip_accumulated_distance']
+                hauler['trip_dump_location'] = loc_name
+                hauler['first_dump_found'] = True
+            
+            # Update last dump distance
+            hauler['trip_last_dump_distance'] = hauler['trip_accumulated_distance']
+            
+            hauler['current_trip']['dump_arrival'] = timestamp
+            hauler['current_trip']['dump_lat'] = lat
+            hauler['current_trip']['dump_lon'] = lon
+            hauler['current_trip']['dump_location'] = loc_name
+            
+            # Calculate lead distance (accumulated so far) - already in KM
+            lead_distance_km = hauler['trip_accumulated_distance']
+            
+            print(f"🚚 {device_id}: At Dump ({loc_name}) at {timestamp}, Lead: {lead_distance_km:.2f} km", file=sys.stderr)
+        
+        # END TRIP - Returned to Excavator
+        elif loc_type == 'excavator' and hauler['at_dump'] and hauler['current_trip'] is not None:
+            if is_inside_polygon or is_within_buffer:
+                hauler['at_dump'] = False
+                hauler['at_excavator'] = False
+                hauler['in_trip'] = False
+                
+                # End distance is accumulated distance (in KM)
+                hauler['trip_end_distance'] = hauler['trip_accumulated_distance']
+                
+                # CALCULATE ALL DISTANCES (already in KM)
+                lead_distance_km = hauler['trip_first_dump_distance']
+                cycle_distance_km = hauler['trip_accumulated_distance']
+                
+                # ===== CALCULATE FUEL CONSUMPTION =====
+                start_fuel = hauler.get('trip_start_fuel', 0)
+                end_fuel = fuel  # Current fuel level at trip end
+                if start_fuel > 0 and end_fuel > 0 and start_fuel > end_fuel:
+                    fuel_consumption = (start_fuel - end_fuel) / 5
+                else:
+                    fuel_consumption = 0
+                
+                trip = {
+                    'excavator_arrival': hauler['current_trip']['excavator_arrival'],
+                    'dump_arrival': hauler['current_trip']['dump_arrival'],
+                    'trip_end': timestamp,
+                    'dump_location': hauler['trip_dump_location'],
+                    'loaded_distance_km': round(lead_distance_km, 2),
+                    'trip_distance_km': round(cycle_distance_km, 2),
+                    'ended_in_maintenance': False,
+                    'ended_in_unknown': False,
+                    'maintenance_distance_km': 0,
+                    'visited_maintenance': hauler['trip_visited_maintenance'],
+                    'started_with_buffer': hauler['trip_started_with_buffer'],
+                    'ended_with_buffer': not is_inside_polygon,
+                    'fuel': round(fuel_consumption, 2),
+                    'lift': 0,
+                    'avg_tonnes': 35
+                }
+                
+                trip['time_at_excavator'] = calculate_duration(trip['excavator_arrival'], trip['dump_arrival'])
+                trip['time_at_dump'] = calculate_duration(trip['dump_arrival'], trip['trip_end'])
+                trip['total_trip_time'] = calculate_duration(trip['excavator_arrival'], trip['trip_end'])
+                
+                hauler['total_loaded_distance_km'] += lead_distance_km
+                hauler['total_trip_distance_km'] += cycle_distance_km
+                hauler['trips'].append(trip)
+                
+                print(f"🚚 {device_id}: TRIP END - Returned to Excavator. Lead: {lead_distance_km:.2f}km, Cycle: {cycle_distance_km:.2f}km", file=sys.stderr)
+                
+                hauler['current_trip'] = None
+                hauler['dump_start_time'] = None
+                hauler['trip_points'] = []
+                hauler['maintenance_points'] = []
+                hauler['last_trip_point'] = None
+                hauler['trip_accumulated_distance'] = 0
+                hauler['excavator_start_lat'] = None
+                hauler['excavator_start_lon'] = None
+                hauler['trip_unknown_points'] = []
+                hauler['trip_started_with_buffer'] = False
+                hauler['trip_first_excavator_distance'] = 0
+                hauler['trip_first_dump_distance'] = 0
+                hauler['trip_last_dump_distance'] = 0
+                hauler['trip_end_distance'] = 0
+                hauler['first_dump_found'] = False
+        
+        # END TRIP - Maintenance interruption
+        elif loc_type == 'maintenance' and hauler['at_dump'] and hauler['current_trip'] is not None:
+            hauler['at_dump'] = False
+            hauler['at_excavator'] = False
+            hauler['in_trip'] = False
+            hauler['trip_ended_in_maintenance'] = True
+            
+            # End distance is accumulated distance (in KM)
+            hauler['trip_end_distance'] = hauler['trip_accumulated_distance']
+            
+            lead_distance_km = hauler['trip_first_dump_distance']
+            cycle_distance_km = hauler['trip_accumulated_distance']
+            maintenance_distance_km = hauler['trip_accumulated_distance'] - hauler['trip_last_dump_distance']
+            
+            # ===== CALCULATE FUEL CONSUMPTION =====
+            start_fuel = hauler.get('trip_start_fuel', 0)
+            end_fuel = fuel  # Current fuel level at trip end
+            if start_fuel > 0 and end_fuel > 0 and start_fuel > end_fuel:
+                fuel_consumption = (start_fuel - end_fuel) / 5
+            else:
+               fuel_consumption = 0
+            
+            trip = {
+                'excavator_arrival': hauler['current_trip']['excavator_arrival'],
+                'dump_arrival': hauler['current_trip']['dump_arrival'],
+                'trip_end': timestamp,
+                'dump_location': hauler['trip_dump_location'],
+                'loaded_distance_km': round(lead_distance_km, 2),
+                'trip_distance_km': round(cycle_distance_km, 2),
+                'ended_in_maintenance': True,
+                'ended_in_unknown': False,
+                'maintenance_distance_km': round(maintenance_distance_km, 2),
+                'visited_maintenance': hauler['trip_visited_maintenance'],
+                'started_with_buffer': hauler['trip_started_with_buffer'],
+                'fuel': round(fuel_consumption, 2),
+                'lift': 0,
+                'avg_tonnes': 35
+            }
+            
+            trip['time_at_excavator'] = calculate_duration(trip['excavator_arrival'], trip['dump_arrival'])
+            trip['time_at_dump'] = calculate_duration(trip['dump_arrival'], trip['trip_end'])
+            trip['total_trip_time'] = calculate_duration(trip['excavator_arrival'], trip['trip_end'])
+            
+            hauler['total_loaded_distance_km'] += lead_distance_km
+            hauler['total_trip_distance_km'] += cycle_distance_km
+            hauler['total_maintenance_distance_km'] += maintenance_distance_km
+            hauler['trips'].append(trip)
+            
+            print(f"🚚 {device_id}: TRIP END - Maintenance! Lead: {lead_distance_km:.2f}km, Cycle: {cycle_distance_km:.2f}km, Maint: {maintenance_distance_km:.2f}km", file=sys.stderr)
+            
+            hauler['current_trip'] = None
+            hauler['dump_start_time'] = None
+            hauler['trip_points'] = []
+            hauler['maintenance_points'] = []
+            hauler['last_trip_point'] = None
+            hauler['trip_accumulated_distance'] = 0
+            hauler['excavator_start_lat'] = None
+            hauler['excavator_start_lon'] = None
+            hauler['trip_unknown_points'] = []
+            hauler['trip_started_with_buffer'] = False
+            hauler['trip_first_excavator_distance'] = 0
+            hauler['trip_first_dump_distance'] = 0
+            hauler['trip_last_dump_distance'] = 0
+            hauler['trip_end_distance'] = 0
+            hauler['first_dump_found'] = False
+        
+        if hauler['current_trip'] is None and loc_type != 'maintenance' and loc_type != 'excavator' and loc_type != 'dump':
+            hauler['in_trip'] = False
+    
+    # ============================================
+    # HANDLE INCOMPLETE TRIPS (Ended in Unknown)
+    # ============================================
+    for device_id, hauler in trips_data.items():
+        if hauler['current_trip'] is not None and hauler['at_dump']:
+            hauler['trip_ended_in_unknown'] = True
+            
+            hauler['trip_end_distance'] = hauler['trip_accumulated_distance']
+            
+            lead_distance_km = hauler['trip_first_dump_distance']
+            cycle_distance_km = hauler['trip_accumulated_distance']
+            
+            # ===== CALCULATE FUEL CONSUMPTION =====
+            start_fuel = hauler.get('trip_start_fuel', 0)
+            end_fuel = hauler.get('last_fuel_level', 0)
+            if start_fuel > 0 and end_fuel > 0 and start_fuel > end_fuel:
+                fuel_consumption = (start_fuel - end_fuel) / 5
+            else:
+                fuel_consumption = 0
+            
+            trip = {
+                'excavator_arrival': hauler['current_trip']['excavator_arrival'],
+                'dump_arrival': hauler['current_trip']['dump_arrival'],
+                'trip_end': hauler['last_record'],
+                'dump_location': hauler['trip_dump_location'],
+                'loaded_distance_km': round(lead_distance_km, 2),
+                'trip_distance_km': round(cycle_distance_km, 2),
+                'ended_in_maintenance': False,
+                'ended_in_unknown': True,
+                'maintenance_distance_km': 0,
+                'visited_maintenance': hauler['trip_visited_maintenance'],
+                'started_with_buffer': hauler['trip_started_with_buffer'],
+                'fuel': round(fuel_consumption, 2),
+                'lift': 0,
+                'avg_tonnes': 35
+            }
+            
+            trip['time_at_excavator'] = calculate_duration(trip['excavator_arrival'], trip['dump_arrival'])
+            trip['time_at_dump'] = calculate_duration(trip['dump_arrival'], trip['trip_end'])
+            trip['total_trip_time'] = calculate_duration(trip['excavator_arrival'], trip['trip_end'])
+            
+            hauler['total_loaded_distance_km'] += lead_distance_km
+            hauler['total_trip_distance_km'] += cycle_distance_km
+            hauler['trips'].append(trip)
+            
+            print(f"🚚 {device_id}: TRIP END - Unknown (incomplete). Lead: {lead_distance_km:.2f}km, Cycle: {cycle_distance_km:.2f}km", file=sys.stderr)
+            
+            hauler['current_trip'] = None
+            hauler['dump_start_time'] = None
+            hauler['trip_points'] = []
+            hauler['maintenance_points'] = []
+            hauler['last_trip_point'] = None
+            hauler['trip_accumulated_distance'] = 0
+            hauler['excavator_start_lat'] = None
+            hauler['excavator_start_lon'] = None
+            hauler['trip_unknown_points'] = []
+            hauler['trip_started_with_buffer'] = False
+            hauler['trip_first_excavator_distance'] = 0
+            hauler['trip_first_dump_distance'] = 0
+            hauler['trip_last_dump_distance'] = 0
+            hauler['trip_end_distance'] = 0
+            hauler['first_dump_found'] = False
+    
+    return trips_data, all_point_data
+
+def create_excel(trips_data, all_point_data):
+    wb = Workbook()
+    
+    if 'Sheet' in wb.sheetnames:
+        wb.remove(wb['Sheet'])
+    
+    header_font = Font(bold=True, color='FFFFFF')
+    header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    center = Alignment(horizontal='center', vertical='center')
+    left_align = Alignment(horizontal='left', vertical='center')
+    
+    # ============================================
+    # HAULER SUMMARY SHEET
+    # ============================================
+    ws_summary = wb.create_sheet(title="Hauler Summary", index=0)
+    
+    ws_summary['A1'] = "MINING HAULER - SHIFT ANALYSIS"
+    ws_summary['A1'].font = Font(size=14, bold=True)
+    ws_summary['A1'].alignment = center 
+    ws_summary.merge_cells('A1:K1')
+    
+    shift_start = ""
+    shift_end = ""
+    for device_id, device_data in trips_data.items():
+        if device_data.get('first_record'):
+            shift_start = device_data.get('first_record', '')
+            shift_end = device_data.get('last_record', '')
+            break
+    
+    # Row 2: Shift information in bold
+    ws_summary['A2'] = f"Shift: {shift_start} → {shift_end}"
+    ws_summary['A2'].font = Font(bold=True, size=12)
+    ws_summary['A2'].alignment = center 
+    ws_summary.merge_cells('A2:K2')
+    #row8:
+    ws_summary['A8'] = "Time in minutes"
+    ws_summary['A8'].font = Font(bold=True, size=12) 
+    ws_summary.merge_cells('A8:K8')
+    #row9
+    ws_summary['A9'] = "Distance in KM"
+    ws_summary['A9'].font = Font(bold=True, size=12) 
+    ws_summary.merge_cells('A9:K9')
+    
+    '''
+    ws_summary['A3'] = f"Excavator Polygon: {len(EXCAVATOR_POLYGON['coordinates'])} points, Buffer: {EXCAVATOR_BUFFER_METERS}m"
+    ws_summary.merge_cells('A3:O3')
+    
+    ws_summary['A4'] = f"Maintenance Area: {MAINTENANCE_LAT}, {MAINTENANCE_LON} (Radius: {MAINTENANCE_RADIUS}m)"
+    ws_summary.merge_cells('A4:O4')
+    
+    ws_summary['A5'] = f"GPS Validation: Max Jump {MAX_GPS_JUMP_METERS}m (1km) - Jumps >1km ignored"
+    ws_summary.merge_cells('A5:O5')
+    
+    ws_summary['A6'] = "Dump Locations:"
+    ws_summary.merge_cells('A6:O6')
+    row = 7
+    for dump in ALL_DUMP_LOCATIONS:
+        if dump['type'] == 'circle':
+            ws_summary.cell(row=row, column=1, value=f"  {dump['name']} (Circle)")
+            ws_summary.cell(row=row, column=2, value=f"Lat: {dump['lat']}, Lon: {dump['lon']}, Radius: {dump['radius']}m")
+        else:
+            ws_summary.cell(row=row, column=1, value=f"  {dump['name']} (Polygon)")
+            ws_summary.cell(row=row, column=2, value=f"Points: {len(dump['coordinates'])}, Buffer: {dump['buffer']}m")
+        ws_summary.merge_cells(f'B{row}:O{row}')
+        row += 1
+    '''
+    headers = ['Hauler', 'Trips', 
+           'Lead Distance', 'Cycle Distance', 'Total Distance',
+           'Avg Cycle Time', 'Running Time', 'Idle Time', 
+           'In Maintenance ', 'Fuel(L)', 'AVG Lift', 'Avg L/Hr', 
+           'Avg L/Tonne', 'Tonne/Hr']
+    
+    row = 4
+    for col, header in enumerate(headers, 1):
+        cell = ws_summary.cell(row=row, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = border
+        cell.alignment = center
+        ws_summary.column_dimensions[chr(64 + col)].width = 16
+    
+    row += 1
+    for hauler in HAULER_SHEETS:
+        for device_id, device_data in trips_data.items():
+            if device_data.get('hauler') == hauler:
+                trips = device_data.get('trips', [])
+                
+                loaded_dist = device_data.get('total_loaded_distance_km', 0)
+                trip_dist = device_data.get('total_trip_distance_km', 0)
+                maint_dist = device_data.get('total_maintenance_distance_km', 0)
+                total_dist = loaded_dist + trip_dist + maint_dist
+                
+                # Get other metrics (you'll need to calculate or fetch these)
+                running_time = sum(trip.get('total_trip_time', 0) for trip in trips)
+                avg_cycle_time = running_time / len(trips) if len(trips) > 0 else 0
+                idle_time = device_data.get('idle_time', 0)
+                in_maintenance = device_data.get('total_maintenance_minutes', 0)
+                fuel = device_data.get('fuel_liters', 0)
+                avg_lift = device_data.get('avg_lift', 0)
+                avg_l_per_hr = device_data.get('avg_l_per_hr', 0)
+                avg_l_per_tonne = device_data.get('avg_l_per_tonne', 0)
+                tonne_per_hr = device_data.get('tonne_per_hr', 0)
+                
+                ws_summary.cell(row=row, column=1, value=f"Hauler {hauler}")
+                ws_summary.cell(row=row, column=2, value=len(trips))
+                ws_summary.cell(row=row, column=3, value=round(loaded_dist, 2))
+                ws_summary.cell(row=row, column=4, value=round(trip_dist, 2))
+                ws_summary.cell(row=row, column=5, value=round(total_dist, 2))  # This is Lead + Cycle (no maintenance)
+                ws_summary.cell(row=row, column=6, value=round(avg_cycle_time, 2))
+                ws_summary.cell(row=row, column=7, value=round(running_time, 2))
+                ws_summary.cell(row=row, column=8, value=round(idle_time, 2))
+                ws_summary.cell(row=row, column=9, value=round(in_maintenance, 2))
+                ws_summary.cell(row=row, column=10, value=round(fuel, 2))
+                ws_summary.cell(row=row, column=11, value=round(avg_lift, 2))
+                ws_summary.cell(row=row, column=12, value=round(avg_l_per_hr, 2))
+                ws_summary.cell(row=row, column=13, value=round(avg_l_per_tonne, 2))
+                ws_summary.cell(row=row, column=14, value=round(tonne_per_hr, 2))
+                
+                
+                for col in range(1, 15):
+                    ws_summary.cell(row=row, column=col).border = border
+                    ws_summary.cell(row=row, column=col).alignment = center
+                row += 1
+    
+    # ============================================
+    # TRIP SHEETS FOR EACH HAULER
+    # ============================================
+    for hauler in HAULER_SHEETS:
+        for device_id, device_data in trips_data.items():
+            if device_data.get('hauler') != hauler:
+                continue
+            
+            trips = device_data.get('trips', [])
+            loaded_dist = device_data.get('total_loaded_distance_km', 0)
+            trip_dist = device_data.get('total_trip_distance_km', 0)
+            maint_dist = device_data.get('total_maintenance_distance_km', 0)
+            total_dist = loaded_dist + trip_dist + maint_dist
+            
+            ws_trip = wb.create_sheet(title=f"Hauler {hauler} Trips")
+            
+            ws_trip['A1'] = f"Hauler {hauler} - Trip Details"
+            ws_trip['A1'].font = Font(size=12, bold=True)
+            ws_trip['A1'].alignment = center 
+            ws_trip.merge_cells('A1:K1')
+            '''
+            ws_trip['A3'] = f"Total Trips: {len(trips)}"
+            ws_trip['A4'] = f"Lead Distance: {loaded_dist:.2f} km (Excavator → Dump)"
+            ws_trip['A5'] = f"Cycle Distance: {trip_dist:.2f} km (Excavator → Dump → Excavator)"
+            ws_trip['A6'] = f"Maintenance Distance: {maint_dist:.2f} km"
+            ws_trip['A7'] = f"Total Distance: {total_dist:.2f} km"
+            ws_trip['A8'] = f"Shift: {device_data.get('first_record', '')} → {device_data.get('last_record', '')}"
+            ws_trip.merge_cells('A3:K3')
+            ws_trip.merge_cells('A4:K4')
+            ws_trip.merge_cells('A5:K5')
+            ws_trip.merge_cells('A6:K6')
+            ws_trip.merge_cells('A7:K7')
+            ws_trip.merge_cells('A8:K8')
+            '''
+            trip_headers = ['Trip No', 'Dump Location', 'Lead Distance (km)', 'Cycle Distance (km)',
+                           'Lead1(min)', 'Lead2(min)', 'Cycle Time(min)', 'Fuel', 'Lift', 'Avg tonnes',
+                           'Maintenance (km)', 'Ended in Maintenance', 'Ended in Unknown']
+            
+            row = 4
+            for col, header in enumerate(trip_headers, 1):
+                cell = ws_trip.cell(row=row, column=col, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.border = border
+                cell.alignment = center
+                ws_trip.column_dimensions[chr(64 + col)].width = 18
+            
+            row = 5
+            for i, trip in enumerate(trips, 1):
+                ws_trip.cell(row=row, column=1, value=i)
+                ws_trip.cell(row=row, column=2, value=trip.get('dump_location', 'Unknown'))
+                ws_trip.cell(row=row, column=3, value=trip.get('loaded_distance_km', 0))
+                ws_trip.cell(row=row, column=4, value=trip.get('trip_distance_km', 0))
+                ws_trip.cell(row=row, column=5, value=trip.get('time_at_excavator', 0))
+                ws_trip.cell(row=row, column=6, value=trip.get('time_at_dump', 0))
+                ws_trip.cell(row=row, column=7, value=trip.get('total_trip_time', 0))
+                ws_trip.cell(row=row, column=8, value=round(trip.get('fuel', 0), 2))
+                ws_trip.cell(row=row, column=9, value=round(trip.get('lift', 0), 2))
+                ws_trip.cell(row=row, column=10, value=round(trip.get('avg_tonnes', 35), 2))
+                ws_trip.cell(row=row, column=11, value=trip.get('maintenance_distance_km', 0) if trip.get('maintenance_distance_km', 0) > 0 else '')
+                
+                ended_in_maint = trip.get('ended_in_maintenance', False)
+                ws_trip.cell(row=row, column=12, value="YES" if ended_in_maint else "NO")
+                if ended_in_maint:
+                    ws_trip.cell(row=row, column=12).fill = PatternFill(start_color='FF0000', end_color='FF0000', fill_type='solid')
+                    ws_trip.cell(row=row, column=12).font = Font(color='FFFFFF')
+                
+                ended_in_unknown = trip.get('ended_in_unknown', False)
+                ws_trip.cell(row=row, column=13, value="YES" if ended_in_unknown else "NO")
+                if ended_in_unknown:
+                    ws_trip.cell(row=row, column=13).fill = PatternFill(start_color='FFA500', end_color='FFA500', fill_type='solid')
+                
+                for col in range(1, 14):
+                    ws_trip.cell(row=row, column=col).border = border
+                    ws_trip.cell(row=row, column=col).alignment = center
+                row += 1
+    '''
+    # ============================================
+    # POINT-BY-POINT ANALYSIS SHEET
+    # ============================================
+    ws_points = wb.create_sheet(title="Point-by-Point Analysis")
+    
+    ws_points['A1'] = "POINT-BY-POINT GPS ANALYSIS WITH TELEMETRY"
+    ws_points['A1'].font = Font(size=14, bold=True)
+    ws_points['A1'].alignment = center 
+    ws_points.merge_cells('A1:L1')
+    
+    ws_points['A3'] = f"Total Points: {len(all_point_data)}"
+    ws_points.merge_cells('A3:L3')
+    
+    ws_points['A4'] = f"Excavator Polygon: {len(EXCAVATOR_POLYGON['coordinates'])} points, Buffer: {EXCAVATOR_BUFFER_METERS}m"
+    ws_points.merge_cells('A4:L4')
+    
+    point_headers = ['Hauler', 'Timestamp', 'Latitude', 'Longitude', 'Location Type', 'Location Name',
+                     'Distance (km)', 'Fuel Consumption (L)', 'Pitch (°)', 'Roll (°)', 'Vibration (m/s²)', 'Fuel (%)', 'Speed (km/h)']
+    
+    row = 6
+    for col, header in enumerate(point_headers, 1):
+        cell = ws_points.cell(row=row, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = border
+        cell.alignment = center
+        ws_points.column_dimensions[chr(64 + col)].width = 18
+    
+    row = 7
+    for point in all_point_data:
+        ws_points.cell(row=row, column=1, value=f"Hauler {point['hauler']}")
+        ws_points.cell(row=row, column=2, value=point['timestamp'])
+        ws_points.cell(row=row, column=3, value=round(point['lat'], 6))
+        ws_points.cell(row=row, column=4, value=round(point['lon'], 6))
+        ws_points.cell(row=row, column=5, value=point['location_type'])
+        
+        if point['location_type'] == 'excavator':
+            ws_points.cell(row=row, column=5).fill = PatternFill(start_color='2ECC71', end_color='2ECC71', fill_type='solid')
+        elif point['location_type'] == 'dump':
+            ws_points.cell(row=row, column=5).fill = PatternFill(start_color='F39C12', end_color='F39C12', fill_type='solid')
+        elif point['location_type'] == 'maintenance':
+            ws_points.cell(row=row, column=5).fill = PatternFill(start_color='3498DB', end_color='3498DB', fill_type='solid')
+        else:
+            ws_points.cell(row=row, column=5).fill = PatternFill(start_color='E74C3C', end_color='E74C3C', fill_type='solid')
+        
+        ws_points.cell(row=row, column=6, value=point['location_name'])
+        ws_points.cell(row=row, column=7, value=round(point.get('distance', 0), 2))
+        ws_points.cell(row=row, column=8, value=round(point.get('fuel_consumption', 0), 2))
+        ws_points.cell(row=row, column=9, value=round(point.get('pitch', 0), 1))
+        ws_points.cell(row=row, column=10, value=round(point.get('roll', 0), 1))
+        ws_points.cell(row=row, column=11, value=round(point.get('vibration', 0), 3))
+        ws_points.cell(row=row, column=12, value=round(point.get('fuel', 0), 1))
+        ws_points.cell(row=row, column=13, value=round(point.get('speed', 0), 1))
+        
+        for col in range(1, 14):
+            ws_points.cell(row=row, column=col).border = border
+            ws_points.cell(row=row, column=col).alignment = center
+        row += 1
+    
+    row += 2
+    ws_points.cell(row=row, column=1, value="POINT ANALYSIS SUMMARY")
+    ws_points.cell(row=row, column=1).font = Font(bold=True, size=12)
+    ws_points.merge_cells(f'A{row}:L{row}')
+    row += 1
+    
+    loc_counts = {}
+    for point in all_point_data:
+        loc_type = point['location_type']
+        loc_counts[loc_type] = loc_counts.get(loc_type, 0) + 1
+    
+    ws_points.cell(row=row, column=1, value="Location Type Distribution:")
+    ws_points.cell(row=row, column=1).font = Font(bold=True)
+    row += 1
+    
+    for loc_type, count in loc_counts.items():
+        ws_points.cell(row=row, column=1, value=f"  {loc_type.upper()}:")
+        ws_points.cell(row=row, column=2, value=count)
+        pct = (count / len(all_point_data)) * 100 if all_point_data else 0
+        ws_points.cell(row=row, column=3, value=f"{pct:.1f}%")
+        row += 1
+    '''
+    # ============================================
+    # TERRAIN ANALYSIS SHEET
+    # ============================================
+    ws_terrain = wb.create_sheet(title="Terrain Analysis")
+
+    ws_terrain['A1'] = "TERRAIN ANALYSIS - PITCH & ROLL"
+    ws_terrain['A1'].font = Font(size=14, bold=True)
+    ws_terrain['A1'].alignment = center
+    ws_terrain.merge_cells('A1:G1')
+
+    # Headers
+    terrain_headers = ['Hauler', 'Steep UP (km)', 'Steep Down (km)', 'Flat (km)', 'Max Pitch', 'Min Pitch', 'Avg Pitch']
+
+    row = 3
+    for col, header in enumerate(terrain_headers, 1):
+        cell = ws_terrain.cell(row=row, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = border
+        cell.alignment = center
+        ws_terrain.column_dimensions[chr(64 + col)].width = 18
+
+    # Calculate and fill data for each hauler
+    row = 4
+    for hauler in HAULER_SHEETS:
+        # Check if hauler exists in trips_data
+        hauler_exists = False
+        for device_id, device_data in trips_data.items():
+            if device_data.get('hauler') == hauler:
+                hauler_exists = True
+                break
+
+        if not hauler_exists:
+            continue
+
+        # Initialize terrain data for this hauler
+        terrain_data = {
+            'steep_up': 0,
+            'steep_down': 0,
+            'flat': 0,
+            'max_pitch': -999,
+            'min_pitch': 999,
+            'pitch_values': []
+        }
+
+        # Loop through all points and filter by hauler
+        for point in all_point_data:
+            if point.get('hauler') != hauler:
+                continue
+
+            distance = point.get('distance', 0)
+            pitch = point.get('pitch', 0)
+
+            # Skip invalid distances
+            if distance <= 0 or distance > 1:
+                continue
+            # Classify terrain
+            if pitch > 8:
+                terrain_data['steep_up'] += distance
+            elif pitch < -8:
+                terrain_data['steep_down'] += distance
+            else:
+                terrain_data['flat'] += distance
+
+            # Track max/min pitch
+            if pitch > terrain_data['max_pitch']:
+                terrain_data['max_pitch'] = pitch
+            if pitch < terrain_data['min_pitch']:
+                terrain_data['min_pitch'] = pitch
+
+            terrain_data['pitch_values'].append(pitch)
+
+        # Calculate average pitch
+        avg_pitch = sum(terrain_data['pitch_values']) / len(terrain_data['pitch_values']) if terrain_data['pitch_values'] else 0
+
+        # Fill the row
+        ws_terrain.cell(row=row, column=1, value=f"Hauler {hauler}")
+        ws_terrain.cell(row=row, column=2, value=round(terrain_data['steep_up'], 2))
+        ws_terrain.cell(row=row, column=3, value=round(terrain_data['steep_down'], 2))
+        ws_terrain.cell(row=row, column=4, value=round(terrain_data['flat'], 2))
+        ws_terrain.cell(row=row, column=5, value=round(terrain_data['max_pitch'], 1))
+        ws_terrain.cell(row=row, column=6, value=round(terrain_data['min_pitch'], 1))
+        ws_terrain.cell(row=row, column=7, value=round(avg_pitch, 1))
+
+        for col in range(1, 8):
+            ws_terrain.cell(row=row, column=col).border = border
+            ws_terrain.cell(row=row, column=col).alignment = center
+        row += 1
+
+    # Add note at bottom
+    note_row = row + 1
+    ws_terrain.cell(row=note_row, column=1, value="Note: Terrain classification based on pitch values:")
+    ws_terrain.merge_cells(f'A{note_row}:G{note_row}')
+    note_row += 1
+    ws_terrain.cell(row=note_row, column=1, value="  Steep UP: Pitch > 8°")
+    ws_terrain.merge_cells(f'A{note_row}:G{note_row}')
+    note_row += 1
+    ws_terrain.cell(row=note_row, column=1, value="  Steep Down: Pitch < -8°")
+    ws_terrain.merge_cells(f'A{note_row}:G{note_row}')
+    note_row += 1
+    ws_terrain.cell(row=note_row, column=1, value="  Flat: -8° ≤ Pitch ≤ 8°")
+    ws_terrain.merge_cells(f'A{note_row}:G{note_row}')
+    
+    
+    # ============================================
+    # TIME BREAKDOWN SHEET
+    # ============================================
+    ws_breakdown = wb.create_sheet(title="Time Breakdown")
+    
+    ws_breakdown['A1'] = "TIME BREAKDOWN - 8 HOUR SHIFT"
+    ws_breakdown['A1'].font = Font(size=14, bold=True)
+    ws_breakdown['A1'].alignment = center 
+    ws_breakdown.merge_cells('A1:F1')
+    
+    headers = ['Hauler', 'At Excavator (min)', 'At Dump (min)', 'In Maintenance (min)', 'Travel/Unknown (min)', 'Total (min)']
+    row = 3
+    for col, header in enumerate(headers, 1):
+        cell = ws_breakdown.cell(row=row, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = border
+        cell.alignment = center
+        ws_breakdown.column_dimensions[chr(64 + col)].width = 18
+    
+    row = 4
+    for hauler in HAULER_SHEETS:
+        for device_id, device_data in trips_data.items():
+            if device_data.get('hauler') == hauler:
+                first_rec = device_data.get('first_record', '')
+                last_rec = device_data.get('last_record', '')
+                total_time = calculate_duration(first_rec, last_rec) if first_rec and last_rec else 0
+                
+                ws_breakdown.cell(row=row, column=1, value=f"Hauler {hauler}")
+                ws_breakdown.cell(row=row, column=2, value=round(device_data.get('total_excavator_minutes', 0), 1))
+                ws_breakdown.cell(row=row, column=3, value=round(device_data.get('total_dump_minutes', 0), 1))
+                ws_breakdown.cell(row=row, column=4, value=round(device_data.get('total_maintenance_minutes', 0), 1))
+                ws_breakdown.cell(row=row, column=5, value=round(device_data.get('total_unknown_minutes', 0), 1))
+                ws_breakdown.cell(row=row, column=6, value=round(total_time, 1))
+                
+                for col in range(1, 7):
+                    ws_breakdown.cell(row=row, column=col).border = border
+                    ws_breakdown.cell(row=row, column=col).alignment = center
+                row += 1
+    
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+# ============================================
+# MAIN
+# ============================================
+
+def main():
+    try:
+        input_data = sys.stdin.read()
+        
+        if not input_data:
+            print(json.dumps({'status': 'error', 'error': 'No input data received'}))
+            return
+        
+        data = json.loads(input_data)
+        records = data.get('data', [])
+        
+        trips_data, all_point_data = analyze_trips(records)
+        
+        print("\n📈 Trip Summary:", file=sys.stderr)
+        total_trips = 0
+        for device_id, device_data in trips_data.items():
+            trip_count = len(device_data.get('trips', []))
+            hauler = device_data.get('hauler', device_id)
+            total_trips += trip_count
+            loaded_dist = device_data.get('total_loaded_distance_km', 0)
+            trip_dist = device_data.get('total_trip_distance_km', 0)
+            maint_dist = device_data.get('total_maintenance_distance_km', 0)
+            total_dist = loaded_dist + trip_dist + maint_dist
+            print(f"  Hauler {hauler}: {trip_count} trips, Lead: {loaded_dist:.2f} km, Cycle: {trip_dist:.2f} km, Maint: {maint_dist:.2f} km, Total: {total_dist:.2f} km", file=sys.stderr)
+            
+            for i, trip in enumerate(device_data.get('trips', []), 1):
+                ended_maint = "YES" if trip.get('ended_in_maintenance', False) else "NO"
+                ended_unknown = "YES" if trip.get('ended_in_unknown', False) else "NO"
+                started_buffer = "YES" if trip.get('started_with_buffer', False) else "NO"
+                maint = trip.get('maintenance_distance_km', 0)
+                print(f"    Cycle {i}: Lead={trip.get('loaded_distance_km', 0):.2f}km, Cycle={trip.get('trip_distance_km', 0):.2f}km, Maint={maint:.2f}km, Started={started_buffer}, EndedMaint={ended_maint}, EndedUnknown={ended_unknown}", file=sys.stderr)
+        
+        print(f"\n📊 Total trips detected: {total_trips}", file=sys.stderr)
+        print(f"📊 Total GPS points analyzed: {len(all_point_data)}", file=sys.stderr)
+        
+        excel_buffer = create_excel(trips_data, all_point_data)
+        excel_base64 = base64.b64encode(excel_buffer.getvalue()).decode('utf-8')
+        
+        print(json.dumps({
+            'status': 'success',
+            'report': excel_base64,
+            'filename': 'Trip_Report.xlsx'
+        }))
+        
+        print("✅ Report generated: Trip_Report.xlsx", file=sys.stderr)
+        
+    except json.JSONDecodeError as e:
+        print(json.dumps({'status': 'error', 'error': f'Invalid JSON: {str(e)}'}), file=sys.stderr)
+    except Exception as e:
+        import traceback
+        print(json.dumps({'status': 'error', 'error': str(e)}), file=sys.stderr)
+        print(traceback.format_exc(), file=sys.stderr)
+
+if __name__ == "__main__":
     main()
