@@ -70,168 +70,6 @@ const registerToken = (req, res) => {
 };
 
 
-/*//THIS CODE WAS WORKING GOODmain code 
-const insertRealtimeData = (req, res) => {
-  const {
-    device_id,
-    equipment_name,
-    latitude,
-    longitude,
-    altitude,
-    speed,
-    pitch,
-    roll,
-    movement,
-    vibration
-  } = req.body;
-
-  if (!device_id) {
-    return res.status(400).json({ error: "Missing required field: device_id" });
-  }
-
-  // Get region_id from devices table
-  const getRegionQuery = `SELECT region_id FROM devices WHERE device_id = ?`;
-
-  db.query(getRegionQuery, [device_id], (err, regionResults) => {
-    if (err) {
-      console.error("❌ Error fetching region_id:", err);
-      return res.status(500).json({ error: "Database error fetching region_id" });
-    }
-
-    if (regionResults.length === 0) {
-      console.error(`❌ Device ${device_id} not found in devices table`);
-      return res.status(404).json({ error: `Device ${device_id} not found` });
-    }
-
-    const region_id = regionResults[0].region_id;
-
-    // Get previous point for distance calculation
-    const getPreviousPointQuery = `
-      SELECT latitude, longitude, timestamp 
-      FROM realtime_sensor_data 
-      WHERE device_id = ? 
-      ORDER BY id DESC 
-      LIMIT 1
-    `;
-
-    db.query(getPreviousPointQuery, [device_id], (err, prevResults) => {
-      let distance = 0;
-      let timeDiffHours = 0;
-
-      if (err) {
-        console.error("❌ Error fetching previous point:", err);
-        return res.status(500).json({ error: "Database error fetching previous data" });
-      }
-      else {
-      // Calculate distance from previous point
-      if (prevResults.length > 0 && prevResults[0].latitude && prevResults[0].longitude) {
-        try {
-          const prevLat = parseFloat(prevResults[0].latitude);
-          const prevLon = parseFloat(prevResults[0].longitude);
-          const currLat = parseFloat(latitude);
-          const currLon = parseFloat(longitude);
-          
-          distance = haversineKm([prevLat, prevLon], [currLat, currLon]);
-          
-          const prevTime = new Date(prevResults[0].timestamp);
-          const currentTime = new Date();
-          timeDiffHours = Math.max(0, (currentTime - prevTime) / 3600000);
-        } catch (error) {
-          console.error('❌ Error in calculation:', error);
-        }
-      }
-      }
-      // Convert movement string to numeric
-      let movementNumeric = 0;
-      if (movement) {
-        if (movement === 'DOWN' || movement === 'DOWNHILL') movementNumeric = -10;
-        else if (movement === 'UP' || movement === 'UPHILL') movementNumeric = 10;
-        else if (movement === 'STABLE' || movement === 'FLAT') movementNumeric = 0;
-        else movementNumeric = parseFloat(movement) || 0;
-      }
-
-      // Calculate fuel and cost
-      const segmentFuelResult = calculateFuelAndCost(
-        distance,
-        parseFloat(pitch) || 0,
-        movementNumeric,
-        device_id,
-        timeDiffHours
-      );
-
-      // Calculate RL
-      const rl = altitude !== undefined ? (parseFloat(altitude) + SEA_LEVEL_RL).toFixed(2) : null;
-
-      // Set MySQL session to IST
-      const setTimezoneQuery = "SET SESSION time_zone = '+05:30'";
-      
-      db.query(setTimezoneQuery, (timezoneErr) => {
-        if (timezoneErr) {
-          console.warn("⚠️ Could not set timezone:", timezoneErr);
-        }
-
-        // INSERT query
-        const insertQuery = `
-          INSERT INTO realtime_sensor_data (
-            device_id, equipment_name, timestamp, latitude, longitude, altitude,
-            speed, pitch, roll, movement, vibration, distance, fuel, fuel_cost, rl, region_id
-          ) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-
-        const values = [
-          device_id,
-          equipment_name,
-          latitude ? parseFloat(latitude) : null,
-          longitude ? parseFloat(longitude) : null,
-          altitude !== undefined ? parseFloat(altitude) : null,
-          speed !== undefined ? parseFloat(speed) : null,
-          pitch !== undefined ? parseFloat(pitch) : null,
-          roll !== undefined ? parseFloat(roll) : null,
-          movement || null,
-          vibration !== undefined ? parseFloat(vibration) : null,
-          parseFloat(distance.toFixed(6)),
-          parseFloat(segmentFuelResult.fuel.toFixed(6)),
-          parseFloat(segmentFuelResult.cost.toFixed(4)),
-          rl,
-          region_id
-        ];
-
-        db.query(insertQuery, values, (err, result) => {
-          if (err) {
-            console.error("❌ Database insert error:", err.sqlMessage);
-            return res.status(500).json({ error: "Database error: " + err.message });
-          }
-
-          // FINAL RESULT PRINT - Simple and clean
-          console.log('\n✅ FINAL RESULT:');
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log(`Device ID: ${device_id}`);
-          console.log(`Equipment: ${equipment_name || 'N/A'}`);
-          console.log(`Position: ${latitude}, ${longitude}`);
-          console.log(`Altitude: ${altitude || 0} m`);
-          console.log(`Speed: ${speed || 0}`);
-          console.log(`Pitch: ${pitch || 0}`);
-          console.log(`Roll: ${roll || 0}`);
-          console.log(`Movement: ${movement || 'N/A'}`);
-          console.log(`Vibration: ${vibration || 0}`);
-          console.log(`RL: ${rl || 0} m`);
-          console.log(`Distance: ${(distance * 1000).toFixed(2)} m`);
-          console.log(`Fuel: ${(segmentFuelResult.fuel * 1000).toFixed(2)} mL`);
-          console.log(`Fuel Cost: ₹${segmentFuelResult.cost.toFixed(4)}`);
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-
-          res.json({
-            status: "success",
-            message: "Data stored successfully",
-            inserted_id: result.insertId
-          });
-        });
-      });
-    });
-  });
-};*/
-
-
 const insertRealtimeData = (req, res) => {
 
   const {
@@ -259,7 +97,7 @@ const insertRealtimeData = (req, res) => {
   }
 
   const FUEL_PRICE_PER_LITER = 90;
-  const SEA_LEVEL_RL = 525.5;
+  const SEA_LEVEL_RL = 496;
 
   /* ========= SAFE NUMBER FUNCTION ========= */
 
@@ -851,150 +689,6 @@ const getDeviceShiftData = (req, res) => {
   });
 };
 
-
-const getAllDevicesShiftData = (req, res) => {
-  console.log('========================================');
-  console.log('getAllDevicesShiftData called at:', new Date().toISOString());
-  console.log('Full req.query:', JSON.stringify(req.query, null, 2));
-  console.log('========================================');
-
-  const { shift, region_id } = req.query;
-
-  if (!shift || !region_id) {
-    return res.status(400).json({
-      error: "shift and region_id required"
-    });
-  }
-
-  const now = new Date();
-  const currentHour = now.getHours();
-
-  const todayObj = new Date();
-  const yesterdayObj = new Date();
-  const tomorrowObj = new Date();
-
-  yesterdayObj.setDate(yesterdayObj.getDate() - 1);
-  tomorrowObj.setDate(tomorrowObj.getDate() + 1);
-
-  const today = todayObj.toISOString().split('T')[0];
-  const yesterday = yesterdayObj.toISOString().split('T')[0];
-  const tomorrow = tomorrowObj.toISOString().split('T')[0];
-
-  let query;
-  let params;
-
-  // ---------------- MORNING ----------------
-  if (shift === 'morning') {
-
-    // before 6AM morning shift hasn't started yet
-    const targetDate = currentHour < 6 ? yesterday : today;
-
-    query = `
-      SELECT *
-      FROM realtime_sensor_data
-      WHERE region_id = ?
-      AND DATE(timestamp) = ?
-      AND TIME(timestamp) >= '06:00:00'
-      AND TIME(timestamp) < '14:00:00'
-      ORDER BY device_id, timestamp ASC
-    `;
-
-    params = [region_id, targetDate];
-  }
-
-  // ---------------- AFTERNOON ----------------
-  else if (shift === 'afternoon') {
-
-    // before 2PM afternoon shift hasn't started yet
-    const targetDate = currentHour < 14 ? yesterday : today;
-
-    query = `
-      SELECT *
-      FROM realtime_sensor_data
-      WHERE region_id = ?
-      AND DATE(timestamp) = ?
-      AND TIME(timestamp) >= '14:00:00'
-      AND TIME(timestamp) < '22:00:00'
-      ORDER BY device_id, timestamp ASC
-    `;
-
-    params = [region_id, targetDate];
-  }
-
-  // ---------------- NIGHT ----------------
-  else if (shift === 'night') {
-
-    let startDate;
-    let endDate;
-
-    // Night shift is active between 22:00 and 06:00
-    if (currentHour >= 22) {
-      // Current night shift
-      startDate = today;
-      endDate = tomorrow;
-    } else {
-      // Before 10PM -> show previous completed night shift
-      startDate = yesterday;
-      endDate = today;
-    }
-
-    query = `
-      SELECT *
-      FROM realtime_sensor_data
-      WHERE region_id = ?
-      AND (
-        (DATE(timestamp) = ? AND TIME(timestamp) >= '22:00:00')
-        OR
-        (DATE(timestamp) = ? AND TIME(timestamp) < '06:00:00')
-      )
-      ORDER BY device_id, timestamp ASC
-    `;
-
-    params = [region_id, startDate, endDate];
-  }
-
-  else {
-    return res.status(400).json({
-      error: "Invalid shift"
-    });
-  }
-
-  console.log('SQL Query:', query);
-  console.log('Params:', params);
-
-  db.query(query, params, (err, results) => {
-    if (err) {
-      console.error("Database Error:", err);
-      return res.status(500).json({
-        error: "Database error"
-      });
-    }
-
-    console.log(`Found ${results.length} records`);
-
-    const filteredResults = results.map(row => {
-      const filteredRow = {};
-
-      Object.keys(row).forEach(key => {
-        if (row[key] !== null && row[key] !== undefined) {
-          filteredRow[key] = row[key];
-        }
-      });
-
-      return filteredRow;
-    });
-
-    res.json({
-      status: "success",
-      region_id,
-      shift,
-      total_records: filteredResults.length,
-      data: filteredResults
-    });
-  });
-};
-
-
 // Get shift data for ALL devices in a region
 //complet code wotking final maincode 
 /*const getAllDevicesShiftData = (req, res) => {
@@ -1111,8 +805,8 @@ const getAllDevicesShiftData = (req, res) => {
   }
 
   // HARDCODED TO JUNE 30, 2026
-  const dateStr = '2026-07-08';
-  const nextDayStr = '2026-07-09';
+  const dateStr = '2026-08-2';
+  const nextDayStr = '2026-08-3';
 
   console.log('📅 Target date:', dateStr);
   console.log('📅 Next day:', nextDayStr);
@@ -1189,6 +883,155 @@ const getAllDevicesShiftData = (req, res) => {
     });
   });
 };*/
+
+
+const getAllDevicesShiftData = (req, res) => {
+  // DEBUG: Log everything
+  console.log('========================================');
+  console.log('getAllDevicesShiftData called at:', new Date().toISOString());
+  console.log('Full req.query:', JSON.stringify(req.query, null, 2));
+  console.log('shift value:', req.query.shift);
+  console.log('region value:', req.query.region);
+  console.log('company value:', req.query.company);
+  console.log('sector value:', req.query.sector);
+  console.log('========================================');
+
+  const { shift, region, company, sector } = req.query;
+
+  if (!shift || !region || !company || !sector) {
+    console.log('❌ Missing parameters!');
+    return res.status(400).json({ 
+      error: "shift, region, company, and sector required" 
+    });
+  }
+
+  // HARDCODED TO AUGUST 2, 2026
+  const dateStr = '2026-08-11';
+  const nextDayStr = '2026-08-12';
+
+  console.log('📅 Target date:', dateStr);
+  console.log('📅 Next day:', nextDayStr);
+
+  const shifts = {
+    'morning': { start: '06:00:00', end: '14:00:00' },
+    'afternoon': { start: '14:00:00', end: '22:00:00' },
+    'night': { start: '22:00:00', end: '06:00:00' }
+  };
+
+  if (!shifts[shift]) {
+    console.log('❌ Invalid shift:', shift);
+    return res.status(400).json({ error: "Invalid shift" });
+  }
+
+  // Step 1: Get all devices for this company, sector, and region
+  // FIXED: Join companies table to get sector_name
+  const getDevicesQuery = `
+    SELECT d.device_id, d.region_id 
+    FROM devices d
+    JOIN regions r ON d.region_id = r.region_id
+    JOIN companies c ON r.company_name = c.company_name
+    WHERE c.company_name = ? 
+    AND c.sector_name = ?
+    AND r.region_name = ?
+  `;
+
+  console.log('🔍 Getting devices with query:', getDevicesQuery);
+  console.log('🔍 Params:', [company, sector, region]);
+
+  db.query(getDevicesQuery, [company, sector, region], (err, devices) => {
+    if (err) {
+      console.error("Error fetching devices:", err);
+      return res.status(500).json({ error: "Database error fetching devices" });
+    }
+
+    if (!devices || devices.length === 0) {
+      console.log('⚠️ No devices found for this region');
+      return res.json({
+        status: "success",
+        region,
+        shift,
+        date: dateStr,
+        total_devices: 0,
+        total_records: 0,
+        data: []
+      });
+    }
+
+    console.log(`📱 Found ${devices.length} devices in region ${region}`);
+
+    // Extract device IDs and region IDs
+    const deviceIds = devices.map(d => d.device_id);
+    const regionId = devices[0].region_id; // All devices in same region
+
+    // Step 2: Get sensor data for all devices
+    let query;
+    let params;
+
+    if (shift === 'night') {
+      query = `
+        SELECT * FROM realtime_sensor_data 
+        WHERE region_id = ?
+        AND device_id IN (?)
+        AND (
+          (DATE(timestamp) = ? AND TIME(timestamp) >= '22:00:00')
+          OR
+          (DATE(timestamp) = ? AND TIME(timestamp) < '06:00:00')
+        )
+        ORDER BY device_id, timestamp ASC
+      `;
+      params = [regionId, deviceIds, dateStr, nextDayStr];
+    } else {
+      query = `
+        SELECT * FROM realtime_sensor_data 
+        WHERE region_id = ?
+        AND device_id IN (?)
+        AND DATE(timestamp) = ?
+        AND TIME(timestamp) BETWEEN ? AND ?
+        ORDER BY device_id, timestamp ASC
+      `;
+      params = [regionId, deviceIds, dateStr, shifts[shift].start, shifts[shift].end];
+    }
+
+    console.log('🔍 SQL Query:', query);
+    console.log('🔍 Params:', params);
+
+    db.query(query, params, (err, results) => {
+      if (err) {
+        console.error("Error:", err);
+        return res.status(500).json({ error: "Database error" });
+      }
+
+      console.log(`✅ Found ${results.length} records for ${shift} shift on ${dateStr}`);
+
+      if (results.length > 0) {
+        console.log('📝 First record timestamp:', results[0].timestamp);
+      }
+
+      const filteredResults = results.map(row => {
+        const filteredRow = {};
+        Object.keys(row).forEach(key => {
+          if (row[key] !== null && row[key] !== undefined) {
+            filteredRow[key] = row[key];
+          }
+        });
+        return filteredRow;
+      });
+
+      res.json({
+        status: "success",
+        region,
+        company,
+        sector,
+        shift,
+        date: dateStr,
+        total_devices: devices.length,
+        devices: deviceIds,
+        total_records: filteredResults.length,
+        data: filteredResults
+      });
+    });
+  });
+};
 // ==================== DAILY (24hr - full day) ====================
 
 const getDeviceDailyData = (req, res) => {
@@ -1244,7 +1087,7 @@ const getDeviceDailyData = (req, res) => {
   });
 };
 
-const getAllDevicesDailyData = (req, res) => {
+/*const getAllDevicesDailyData = (req, res) => {
   const { region_id } = req.query;
 
   if (!region_id) {
@@ -1310,8 +1153,117 @@ const getAllDevicesDailyData = (req, res) => {
       grouped_by_device: groupedByDevice
     });
   });
-};
+};*/
+const getAllDevicesDailyData = (req, res) => {
+  console.log('========================================');
+  console.log('getAllDevicesDailyData called at:', new Date().toISOString());
+  console.log('Full req.query:', JSON.stringify(req.query, null, 2));
+  console.log('========================================');
 
+  const { region, company, sector } = req.query;
+
+  if (!region || !company || !sector) {
+    console.log('❌ Missing parameters!');
+    return res.status(400).json({ 
+      error: "region, company, and sector required" 
+    });
+  }
+
+  // HARDCODED TO AUGUST 2, 2026
+  const dateStr = '2026-09-03';
+  const nextDayStr = '2026-09-04';
+
+  console.log('📅 Target date:', dateStr);
+  console.log('📅 Next day:', nextDayStr);
+
+  // Get devices with company, sector, region
+  const getDevicesQuery = `
+    SELECT d.device_id, d.region_id 
+    FROM devices d
+    JOIN regions r ON d.region_id = r.region_id
+    JOIN companies c ON r.company_name = c.company_name
+    WHERE c.company_name = ? 
+    AND c.sector_name = ?
+    AND r.region_name = ?
+  `;
+
+  db.query(getDevicesQuery, [company, sector, region], (err, devices) => {
+    if (err) {
+      console.error("Error fetching devices:", err);
+      return res.status(500).json({ error: "Database error fetching devices" });
+    }
+
+    if (!devices || devices.length === 0) {
+      console.log('⚠️ No devices found for this region');
+      return res.json({
+        status: "success",
+        region,
+        date: dateStr,
+        total_devices: 0,
+        total_records: 0,
+        data: []
+      });
+    }
+
+    console.log(`📱 Found ${devices.length} devices in region ${region}`);
+
+    const deviceIds = devices.map(d => d.device_id);
+    const regionId = devices[0].region_id;
+
+    // Get daily data (6 AM to next day 6 AM)
+    const query = `
+      SELECT * FROM realtime_sensor_data 
+      WHERE region_id = ?
+      AND device_id IN (?)
+      AND timestamp >= ? 
+      AND timestamp < ?
+      ORDER BY device_id, timestamp ASC
+    `;
+
+    const startDateTime = `${dateStr} 06:00:00`;
+    const endDateTime = `${nextDayStr} 06:00:00`;
+
+    const params = [regionId, deviceIds, startDateTime, endDateTime];
+
+    console.log('🔍 SQL Query:', query);
+    console.log('🔍 Params:', params);
+
+    db.query(query, params, (err, results) => {
+      if (err) {
+        console.error("Error:", err);
+        return res.status(500).json({ error: "Database error" });
+      }
+
+      console.log(`✅ Found ${results.length} records for daily data`);
+
+      const filteredResults = results.map(row => {
+        const filteredRow = {};
+        Object.keys(row).forEach(key => {
+          if (row[key] !== null && row[key] !== undefined) {
+            filteredRow[key] = row[key];
+          }
+        });
+        return filteredRow;
+      });
+
+      res.json({
+        status: "success",
+        region,
+        company,
+        sector,
+        period: {
+          from: startDateTime,
+          to: endDateTime,
+          duration: "24 hours"
+        },
+        total_devices: devices.length,
+        devices: deviceIds,
+        total_records: filteredResults.length,
+        data: filteredResults
+      });
+    });
+  });
+};
 // ==================== MONTHLY (1st to last day OR 1st to today) ====================
 
 // Get monthly data for a specific device
@@ -1460,8 +1412,6 @@ const getDevices = (req, res) => {
 };
 
 
-//i am using this
-
 const fetchDashboardDataby = (req, res) => {
   const { company, region } = req.query;
 
@@ -1564,11 +1514,10 @@ const fetchDashboardDataby = (req, res) => {
   );
 };
 
-
 // ==================== ANALYSIS ENDPOINT ====================
 
 //final working code proper main code 
-const generateAnalysisReport = (req, res) => {
+/*const generateAnalysisReport = (req, res) => {
   const {
     device_id,
     timeRange,
@@ -1700,10 +1649,10 @@ const generateAnalysisReport = (req, res) => {
     console.log(`🚀 Sending ${records.length} records to Python for analysis...`);
 
     // Call Python script
-    const pythonPath = '/opt/sample/venv/bin/python'; // ✅ venv python
+    //const pythonPath = '/opt/sample/venv/bin/python'; // ✅ venv python
 
-    const pythonProcess = exec(`${pythonPath} routes/analysis.py`, (error, stdout, stderr) => {
-    //const pythonProcess = exec('python routes/analysis.py', (error, stdout, stderr) => {
+    //const pythonProcess = exec(`${pythonPath} routes/analysis.py`, (error, stdout, stderr) => {
+    const pythonProcess = exec('python routes/analysis.py', (error, stdout, stderr) => {
       if (error) {
         console.error('❌ Python error:', error);
         return originalJson.call(res, { error: "Analysis failed: " + error.message });
@@ -1762,7 +1711,7 @@ const generateAnalysisReport = (req, res) => {
 
   // Call the appropriate data fetcher
   dataFetcher(req, res);
-};
+};*/
 
 
 //report for coustom data 
@@ -1946,8 +1895,187 @@ const generateAnalysisReport = (req, res) => {
 
   // Call the appropriate data fetcher
   dataFetcher(req, res);
-};*/
+};
+*/
+const generateAnalysisReport = (req, res) => {
+  const {
+    timeRange,
+    shift,
+    company,
+    sector,
+    region
+  } = req.query;
 
+  // Validate required parameters
+  if (!timeRange) {
+    return res.status(400).json({
+      error: "timeRange required"
+    });
+  }
+
+  if (!company || !sector || !region) {
+    return res.status(400).json({
+      error: "company, sector, and region required"
+    });
+  }
+
+  console.log(`📊 Generating analysis for Company: ${company}, Sector: ${sector}, Region: ${region}`);
+  console.log(`📊 TimeRange: ${timeRange}${shift ? ', Shift: ' + shift : ''}`);
+
+  // HARDCODED TO JUNE 30, 2026
+  const targetDate = '2026-06-30';
+  
+  // Choose the right data fetcher based on timeRange
+  let dataFetcher;
+
+  if (timeRange === 'shift' && shift) {
+    console.log('🔄 Shift report requested');
+    console.log('  Shift from query:', shift);
+    console.log('  Region:', region);
+    console.log('  Company:', company);
+    console.log('  Sector:', sector);
+
+    let shiftParam = '';
+    if (shift === '6am-2pm') shiftParam = 'morning';
+    else if (shift === '2pm-10pm') shiftParam = 'afternoon';
+    else if (shift === '10pm-6am') shiftParam = 'night';
+    else shiftParam = shift;
+
+    console.log('  Mapped shiftParam:', shiftParam);
+
+    // Pass all parameters to the data fetcher
+    req.query.shift = shiftParam;
+    req.query.company = company;
+    req.query.sector = sector;
+    req.query.region = region;
+
+    dataFetcher = getAllDevicesShiftData;
+  }
+  else if (timeRange === 'daily') {
+    req.query.company = company;
+    req.query.sector = sector;
+    req.query.region = region;
+    dataFetcher = getAllDevicesDailyData;
+  }
+  else if (timeRange === 'monthly') {
+    req.query.company = company;
+    req.query.sector = sector;
+    req.query.region = region;
+    dataFetcher = getAllDevicesMonthlyData;
+  }
+  else {
+    return res.status(400).json({ error: "Invalid timeRange" });
+  }
+
+  // Store the original res.json
+  const originalJson = res.json;
+
+  // Override res.json to capture the data
+  res.json = function (data) {
+    // Check if we have data in any format
+    let records = [];
+
+    // Handle different response formats
+    if (data && data.data && Array.isArray(data.data)) {
+      records = data.data;
+    } else if (data && Array.isArray(data)) {
+      records = data;
+    } else if (data && data.results && Array.isArray(data.results)) {
+      records = data.results;
+    }
+
+    console.log(`📊 Found ${records.length} records for analysis (Date: ${targetDate})`);
+
+    if (records.length === 0) {
+      console.log('⚠️ No records found, returning empty report');
+      return originalJson.call(res, { 
+        status: 'warning', 
+        message: 'No data found for the selected criteria'
+      });
+    }
+
+    // Format data for Python
+    const pythonInput = {
+      data: records.map(row => ({
+        device_id: row.device_id || 'unknown',
+        time: row.timestamp,
+        lat: parseFloat(row.latitude || 0),
+        lon: parseFloat(row.longitude || 0),
+        pitch: parseFloat(row.pitch || 0),
+        roll: parseFloat(row.roll || 0),
+        fuel: parseFloat(row.fuel || 0),
+        fuel_consumption: parseFloat(row.fuel_consumption || 0),
+        speed: parseFloat(row.speed || 0),
+        distance: parseFloat(row.distance || 0),
+        alt: parseFloat(row.altitude || 0),
+        rl: parseFloat(row.rl || 0),
+        fuel_cost: parseFloat(row.fuel_cost || 0),
+        vibration: parseFloat(row.vibration || 0)
+      })),
+      report_type: timeRange,
+      target_date: targetDate,
+      shift: shift || null,
+      company: company,
+      sector: sector,
+      region: region
+    };
+
+    console.log(`🚀 Sending ${records.length} records to Python for analysis...`);
+
+    // Call Python script
+    const pythonProcess = exec('python routes/analysis.py', (error, stdout, stderr) => {
+      if (error) {
+        console.error('❌ Python error:', error);
+        return originalJson.call(res, { error: "Analysis failed: " + error.message });
+      }
+
+      if (stderr) {
+        console.log('📝 Python log:', stderr);
+      }
+
+      try {
+        const result = JSON.parse(stdout);
+
+        if (result.status === 'error') {
+          console.error('❌ Python analysis error:', result.error);
+          return originalJson.call(res, { error: result.error });
+        }
+
+        if (!result.report) {
+          console.error('❌ No report data in Python output');
+          console.log('Python output keys:', Object.keys(result));
+          return originalJson.call(res, { error: "No report data generated" });
+        }
+
+        const excelBuffer = Buffer.from(result.report, 'base64');
+        const filename = result.filename || `analysis_${company}_${region}_${timeRange}_${targetDate}.xlsx`;
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', excelBuffer.length);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+
+        res.send(excelBuffer);
+
+        console.log(`✅ Analysis complete! Excel report sent: ${filename}`);
+        console.log(`📊 Report size: ${(excelBuffer.length / 1024).toFixed(2)} KB`);
+
+      } catch (e) {
+        console.error('❌ Failed to parse Python output:', e);
+        console.log('Raw output (first 500 chars):', stdout.substring(0, 500));
+        originalJson.call(res, { error: "Failed to generate report - invalid response from analysis engine" });
+      }
+    });
+
+    pythonProcess.stdin.write(JSON.stringify(pythonInput));
+    pythonProcess.stdin.end();
+  };
+
+  // Call the appropriate data fetcher
+  dataFetcher(req, res);
+};
 // ==================== EXPORT ALL FUNCTIONS ====================
 module.exports = {
   register,

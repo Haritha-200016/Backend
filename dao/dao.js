@@ -3,7 +3,7 @@ const config = require('../config/dbconfig'); // Import database config
 
 // Create a MySQL connection pool
 const pool = mysql.createPool({
-    connectionLimit: 10, // You can adjust this number
+    connectionLimit: 100, // You can adjust this number
     host: config.host,
     user: config.user,
     password: config.password,

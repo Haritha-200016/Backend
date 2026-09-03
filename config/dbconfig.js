@@ -6,4 +6,3 @@ module.exports = {
     database: "project",
     timezone: '+05:30',
 }
-

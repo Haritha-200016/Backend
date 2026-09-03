@@ -13,11 +13,11 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use("/models", express.static("temp_models"));
 
-app.use(express.json({ limit: "200mb" }));
-app.use(express.urlencoded({ extended: true, limit: "200mb" }));
+app.use(express.json({ limit: "500mb" }));
+app.use(express.urlencoded({ extended: true, limit: "500mb" }));
 
 
-const PORT = 5003;
+const PORT = 5001;
 
 // Company/region APIs
 app.get('/getcompanies', fetch.getcompanies);
@@ -25,7 +25,6 @@ app.get('/sectors', fetch.getsectors);
 app.get('/getregions', fetch.getregions);
 
 // Dashboard APIs
-//app.get('/fetch-dashboard-data', insert.fetchDashboardData);
 app.get('/api/get_last_10_zaxis', insert.getLast10ZAxis);
 app.post('/insert-realtime-data', insert.insertRealtimeData);
 
@@ -47,7 +46,7 @@ app.get('/getDevice-ShiftData',insert.getDeviceShiftData);
 
 
 
-app.get('/generate-analysis', insert.generateAnalysisReport);
+app.get('/generateAnalysisReport', insert.generateAnalysisReport);
 // Device list endpoint
 app.get('/api/devices', insert.getDevices);
 app.get('/fetchDashboardDataby',insert.fetchDashboardDataby)
@@ -83,6 +82,4 @@ app.get('/', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
   console.log(`📡 24-hour data endpoints available:`);
-  console.log(`   GET /fetch-24h-data?device_id=D3&company=TMC&region=Kache`);
-  console.log(`   GET /fetch-all-devices-24h?company=TMC&region=Kache`);
 });
